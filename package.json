@@ -1,16 +1,17 @@
 {
   "name": "hunch",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Ctrl+F with a hunch. A Firefox extension that lights up the paragraph that answers your question",
+  "description": "Hunch fork with condition search, scoped source results and local excerpts",
   "author": "tymscar",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tymscar/hunch"
+    "url": "https://github.com/knockkeykey/hunch"
   },
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
@@ -26,9 +27,15 @@
     "@typesafe-ai/sdk": "^0.6.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.11",
     "@types/webextension-polyfill": "^0.12.1",
     "esbuild": "^0.25.0",
+    "jsdom": "^29.1.1",
     "typescript": "^5.6.0",
+    "web-ext": "^10.7.0",
     "webextension-polyfill": "^0.12.0"
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   }
 }

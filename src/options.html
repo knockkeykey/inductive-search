@@ -17,18 +17,20 @@
 </style></head>
 <body>
   <h1>Hunch</h1>
-  <p>Only the text of the page you invoke it on is sent to TypeSafe, and only while the find bar is open.</p>
-  <p id="nokey" style="display:none;padding:10px 12px;border-radius:6px;background:#fef3c7;color:#92400e">You need a TypeSafe API key before the first search. Create one at <a href="https://console.typesafe.ai/keys" target="_blank">console.typesafe.ai/keys</a>, paste it below, and save.</p>
-  <label>TypeSafe API key <input id="apiKey" type="password" placeholder="apikey_…"></label>
+  <p>The page text, URL, title and query are sent to your selected provider only while the find bar is open.</p>
+  <label>API provider <select id="provider" disabled><option value="typesafe">TypeSafe (official)</option><option value="openrouter">OpenRouter (Jev)</option><option value="openlux">OpenLux (Jev)</option></select></label>
+  <p id="nokey" style="display:none;padding:10px 12px;border-radius:6px;background:#fef3c7;color:#92400e">You need an API key before the first search. Create one at <a id="keyLink" href="https://console.typesafe.ai/keys" target="_blank" rel="noreferrer">TypeSafe keys</a>, paste it below, and save.</p>
+  <label><span id="keyLabel">TypeSafe API key</span> <input id="apiKey" type="password" placeholder="apikey_…" autocomplete="off"></label>
   <label>Model <small id="modelNote"></small>
     <select id="model"></select></label>
+  <small>OpenRouter and OpenLux use Jev's System One API. Chat models such as GPT and Claude are not supported. Each provider keeps its own key and model.</small>
   <label>Shortcut <small id="shortcutHint">Click the field and press the keys you want.</small>
     <span class="row">
       <input id="shortcut" type="text" readonly placeholder="…">
       <button id="resetShortcut" type="button" class="secondary">Reset to default</button>
     </span>
     <small id="shortcutNote"></small></label>
-  <button id="save" type="button">Save</button><span id="saved"></span>
+  <button id="save" type="button" disabled>Save</button><span id="saved"></span>
   <script src="options.js"></script>
 </body>
 </html>

@@ -2,21 +2,28 @@ import type { BlockId } from "../shared/protocol";
 import { THRESHOLD } from "../shared/questions";
 import type { PageBlock } from "./blocks";
 
-export interface Hit {
-  el: HTMLElement;
+export interface Hit extends PageBlock {
   p: number;
+  conditionScores: number[];
 }
 
-export function rankHits(blocks: readonly PageBlock[], scores: Record<BlockId, number>): Hit[] {
+export function rankHits(
+  blocks: readonly PageBlock[],
+  scores: Record<BlockId, number>,
+  conditionScores: Record<BlockId, number[]> = {},
+): Hit[] {
   return blocks
-    .map((b) => ({ el: b.el, p: scores[b.id] ?? 0 }))
+    .map((b) => ({ ...b, p: scores[b.id] ?? 0, conditionScores: conditionScores[b.id] ?? [] }))
     .filter((h) => h.p >= THRESHOLD)
     .sort((a, b) => b.p - a.p);
 }
 
 export function paint(hits: readonly Hit[]) {
   clearPaint();
+  const seen = new Set<HTMLElement>();
   for (const { el, p } of hits) {
+    if (seen.has(el)) continue;
+    seen.add(el);
     el.classList.add("hunch-hl");
 
     if (getComputedStyle(el).position === "static") el.classList.add("hunch-rel");

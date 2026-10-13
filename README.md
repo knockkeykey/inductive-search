@@ -1,58 +1,129 @@
-# <img src="src/icons/icon.svg" width="32" alt="" align="top"> Hunch
+# Hunch 中文增强版
 
-<p align="center">
-  <img src="docs/hunch-hero.png" alt="Searching the NixOS manual for &quot;remote install&quot; with Hunch. On a Mac (left) the paragraph about continuing the installation over SSH is highlighted at 0.86 and the bar reads 1 of 13 · 86% · on this page · 76%, with ticks on the right edge marking every hit. On an iPhone in Safari (right) the same paragraph is highlighted at 0.84.">
-</p>
+基于 [tymscar/hunch](https://github.com/tymscar/hunch) 的公开 Fork，由 [knockkeykey](https://github.com/knockkeykey) 维护。本项目保留原作者 **Oscar Molnar（tymscar）** 的代码历史与 MIT 许可证。
 
-Ctrl+F with a hunch.
-Ask a page a question and the paragraph that answers it lights up, with a probability next to it.
-It also tells you when the answer is not on the page at all.
+原项目提供由 Jev 驱动的网页段落查找。本分支增加条件筛选、原文结果侧边栏、搜索范围和带来源的本地摘录，并接入 OpenRouter 与 OpenLux。
 
-Powered by [TypeSafe AI](https://docs.typesafe.ai).
-Jev is not an LLM. It does not generate text. When you use this extension you send a question to the API along the lines of:
-Does *this* element on the page describes X.
-Jev then goes through every element on that page and answers that questions with yes/no and a probability.
-The extension then highlights the elements with the highest probability of being the answer.
+## 本分支新增的功能
 
-## Use
+| 功能 | 使用方式 |
+| --- | --- |
+| 按条件找原文 | 每行一个条件，最多 5 个；选择全部满足或任一满足 |
+| 搜索结果侧边栏 | 查看原文、所在标题和各条件分数；点击定位网页段落 |
+| 搜索范围 | 整页、仅正文、当前选区 |
+| 原文摘录与来源保存 | 保存原文、网页标题、网址、所在标题、搜索条件与时间；复制或导出 Markdown |
+| API 服务商切换 | TypeSafe、OpenRouter、OpenLux 的 Key 和模型分别保存 |
+| 中文输入与搜索状态 | 支持两字问题和输入法；手动提交搜索；区分无高相关结果与部分请求失败 |
 
-- `Alt+F` on macOS, `Ctrl+Shift+F` elsewhere; Cmd+F and Ctrl+F stay the normal find. Change it in Hunch's settings page: click the shortcut field and press the keys you want. In Chrome, change it at chrome://extensions/shortcuts, where it is listed as "Activate the extension".
-- Type in a search query. This can be a word your're looking for, a question, a sentence. Enter/Shift-Enter cycles you to the best first one and you can see all results on the scrollbar just like with normal search.
+摘录侧边栏标注上游来源。新功能属于本分支，不表示上游已经合并或支持它们。
 
-To use this you need to have a Typesafe API. You can add it in the settings of the extension. To get one, go to https://console.typesafe.ai/keys
+## 安装
 
-
-https://github.com/user-attachments/assets/606156ad-5529-4db0-b348-4942c0b6c24b
-
-
-## Where it cannot run
-
-Browsers do not let extensions touch their built-in PDF viewer, `about:` and `chrome://` pages, reader view, or their extension stores. On those the toolbar icon briefly shows an `n/a` badge and nothing else happens.
-
-## Develop
+需要 Node.js 20.19+、22.13+ 或 24+（开发依赖的要求）。
 
 ```sh
-nix develop
-npm install
+git clone https://github.com/knockkeykey/hunch.git
+cd hunch
+npm ci
 npm run build
-npm run watch
-npm run check
-npm run lint:fix
 ```
 
-The build produces `dist/firefox`, `dist/chrome`, and `dist/safari`.
+- **Chrome / Edge**：打开 `chrome://extensions` 或 `edge://extensions`，启用开发者模式，选择“加载未打包的扩展程序”，加载 `dist/chrome`。
+- **Firefox**：在 `about:debugging#/runtime/this-firefox` 加载 `dist/firefox/manifest.json`，这是临时附加组件。
+- 构建也输出 `dist/safari`；Safari 需要另行转换并打包，当前没有验证 Safari 的运行效果。
 
-In Firefox, load `dist/firefox/manifest.json` as a temporary add-on at `about:debugging#/runtime/this-firefox`.
-In Chrome, turn on Developer mode at `chrome://extensions` and click on `Load unpacked` on the `dist/chrome` folder.
+更新代码后重新构建并在扩展管理页重新加载；已经打开的网页建议刷新。
 
-All questions and thresholds live in `src/shared/questions.ts`. If you have any modification to how the search works, that's the best place to do them.
+## 配置 API
 
-## How big pages are handled
+打开扩展设置，选择服务商，粘贴该服务商的 Key，点击 Save。
 
-One annoying thing about Jev today is the very small context window: 64k tokens.
-That means both the state and the questions. Now I'm sure that's going to grow substantially in the future, but for right now my way around the issue when it comes to massive pages (say for example the curl man page), is to chunk the request into 160 blocks each, and send them all in parallel.
-Results get drawn as soon as they come back. Normal pages will fit into one request most of the time.
+| 服务商 | 获取 Key | 默认模型 | 搜索接口 |
+| --- | --- | --- | --- |
+| TypeSafe 官方 | [TypeSafe Console](https://console.typesafe.ai/keys) | `jev-latest` | `https://api.typesafe.ai/v1/systemone` |
+| OpenRouter | [OpenRouter Keys](https://openrouter.ai/settings/keys) | `~typesafe/jev-latest` | `https://openrouter.ai/api/v1/systemone` |
+| OpenLux | [OpenLux Console](https://www.openlux.ai/login) | `jev-1.13.0` | `https://api.openlux.ai/v1/systemone` |
 
-## Privacy and licence
+OpenRouter 可固定选择 `typesafe/jev-1.13`，接入依据为 [官方 TypeSafe SDK 指南](https://openrouter.ai/docs/guides/community/typesafe-sdk)。
 
-Page text is sent to TypeSafe only while the bar is open on that page, and nothing else is collected. Details in [PRIVACY.md](PRIVACY.md). MIT licensed, see [LICENSE](LICENSE).
+OpenLux 使用 [Jev 专用 System One 文档](https://doc.openlux.ai/en/reference/typesafe/v1/systemone?leaf=c%3A1790771919883) 中的 `state` 和 `questions` 请求格式。模型菜单还提供站点通用示例中的 `jev-1.13.0:stable` 路由名，但该别名是否可用取决于账号权限，尚未用真实 Key 验证。该模型的专用接口为 `/v1/systemone`，不使用通用的 Chat Completions 示例。
+
+这里调用的是 Jev 决策模型。GPT、Claude 等自由文本聊天模型不能直接替代它。
+
+## 使用
+
+macOS 按 **Option + F**，其他平台默认 **Ctrl + Shift + F**，也可以点击工具栏 Hunch 图标。正常的 Cmd/Ctrl + F 保持不变。
+
+Chrome 的快捷键在 `chrome://extensions/shortcuts` 修改；Firefox 可在扩展设置页修改。
+
+### 按意思找
+
+选择“按意思找”，输入问题，按 Enter 或点击“搜索”。支持中文两字输入；拼音确认不会提交请求。仅输入文字不会调用 API。
+
+例如：
+
+- 哪一段写了小蝌蚪认错妈妈？
+- 哪些内容提到了退款限制？
+- 作者实际测试发现了什么？
+
+### 按条件找
+
+选择“按条件找”，每行写一个可由原文判断的条件，例如：
+
+```text
+描述作者实际进行的测试
+包含具体数字或测量结果
+```
+
+- **全部满足**：同一文字块的每个条件分数都必须达到阈值。
+- **任一满足**：至少一个条件达到阈值。
+- 点击“搜索”提交；条件框中 Enter 换行，Cmd/Ctrl + Enter 提交。
+
+Jev 为每个条件分别返回判断分数。全部满足取最低分、任一满足取最高分用于筛选和排序；这不是复合事件的校准概率。侧边栏显示每个条件的分数，方便检查判断。
+
+条件应用于每个文字块。分散在不同段落的证据不会自动合并为“同一段满足全部条件”。
+
+### 搜索范围
+
+- **整页**：页面可提取的可见文字，包括导航和推荐区域。
+- **仅正文**：优先提取 `article`，其次 `main` / 主内容区域；没有明确正文结构时使用整页并排除语义导航区域。自动识别可能不准确。
+- **当前选区**：先在网页上选中文字，再打开 Hunch 或选择这个范围。只提交选中的文字，保留其原文位置用于跳转。
+
+每次提交都会重新提取范围内文字。尚未加载的内容、iframe 内部和封闭 Shadow DOM 内容不在提取范围中。
+
+### 结果与摘录
+
+- 侧边栏展示符合阈值的原文，点击结果跳转；底部 ▲ / ▼ 切换结果。
+- “复制原文与来源”复制段落、标题、网址和所在标题。
+- “保存摘录”存到浏览器扩展的本地存储，相同网址和原文不会重复保存。
+- “已存摘录”展示各网页保存的内容，支持复制、单条删除和导出 Markdown。
+- 摘录最多 500 条，达到上限后请先导出并清理。删除扩展也会删除其本地数据，请提前导出。
+- “结果 / 摘录”可收起或展开侧边栏；再次按快捷键或按 Esc 关闭整个查找界面。
+
+## 实现原理与边界
+
+Hunch 提取页面文字并分块，给每个块生成 Jev `noul` 问题。后台把网页标题、网址、文字块和问题发给选定服务商，验证返回值后把评分发回网页。界面按阈值 0.4 筛选、排序并高亮原文。
+
+评分反映模型对条件是否满足的判断，不是事实正确率，也不代表关键词出现次数。当前没有精确关键词匹配兜底，因此页面出现某个词也可能没有高相关结果。这个插件定位原文，不生成答案或推理解释。
+
+长页按文字量和问题数量分批，最多 4 个请求并行。OpenLux 使用更小批次给条件问题留出空间；字符预算是估算，不是精确 token 计数。已完成批次会逐步显示；部分失败会明确提示结果不完整。
+
+浏览器限制访问的页面（`chrome://`、`about:`、扩展商店和内置 PDF 阅读器等）无法使用。
+
+## 开发与验证
+
+```sh
+npm test
+npm run check
+npm run watch
+```
+
+`npm run check` 依次执行类型检查、Biome 检查、构建和 Firefox 扩展校验。自动测试覆盖服务商路由、快捷键触发、条件组合与请求预算、范围边界、并发摘录保存、Markdown 来源保留和侧边栏交互。
+
+自动测试使用模拟 API，不代表真实 Jev 的命中质量或账号额度已经验证。实际效果需使用自己的 Key，在目标网页上确认。
+
+## 隐私与许可证
+
+只有提交搜索时才向所选服务商发送当前范围的文字、页面标题、网址和问题。关闭搜索会取消客户端请求；已经被服务商接收的请求仍可能计费。已存摘录不会随其他搜索发给服务商，默认不云同步。
+
+详见 [PRIVACY.md](PRIVACY.md)。保留原作者的 [MIT License](LICENSE)。上游项目：[tymscar/hunch](https://github.com/tymscar/hunch)。

@@ -1,12 +1,15 @@
 import browser from "webextension-polyfill";
 import { answer } from "./background/answer";
+import { handleExcerpts } from "./background/excerpts";
+import { PROVIDERS } from "./shared/api";
+import type { ExcerptRequest } from "./shared/excerpts";
 import { SEARCH_PORT, type Search, type SearchEvent, type TabMessage } from "./shared/protocol";
-import { hasApiAccess, loadSettings, requestApiAccess } from "./shared/settings";
-import { shortcutLabel } from "./shared/shortcut";
+import { hasApiAccess, loadSettings } from "./shared/settings";
 
 async function toggle(tabId: number | undefined) {
   if (tabId === undefined) return;
-  await requestApiAccess();
+  // Opening the bar must not depend on an API permission prompt. Chrome loses the
+  // user gesture after async storage reads; request provider access from Save instead.
   if (!(await ensureContentScript(tabId))) return unavailable(tabId);
   await sendToTab(tabId, { type: "toggle" });
 }
@@ -44,7 +47,20 @@ browser.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === "install" && !(await loadSettings()).apiKey) void browser.runtime.openOptionsPage();
 });
 
-browser.action.onClicked.addListener((tab) => void toggle(tab.id));
+browser.action.onClicked.addListener(async (tab) => {
+  try {
+    await toggle(tab.id);
+  } catch (error) {
+    console.error("Hunch activation failed:", error);
+    if (tab.id !== undefined) await unavailable(tab.id);
+  }
+});
+
+browser.runtime.onMessage.addListener((message: unknown) => {
+  const request = message as ExcerptRequest;
+  if (["excerpt-list", "excerpt-save", "excerpt-delete"].includes(request?.type)) return handleExcerpts(request);
+  return undefined;
+});
 
 browser.runtime.onConnect.addListener((port) => {
   if (port.name !== SEARCH_PORT) return;
@@ -63,11 +79,13 @@ browser.runtime.onConnect.addListener((port) => {
         void browser.runtime.openOptionsPage();
         return emit({ type: "failure", message: "No API key yet. Paste one in the settings tab that just opened." });
       }
-      if (!(await hasApiAccess()))
+      if (!(await hasApiAccess(settings.provider))) {
+        void browser.runtime.openOptionsPage();
         return emit({
           type: "failure",
-          message: `Hunch needs permission to reach api.typesafe.ai. Press ${await shortcutLabel()} again and accept the prompt.`,
+          message: `Hunch needs permission to reach ${PROVIDERS[settings.provider].name}. In the settings tab, click Save and allow access, then retry your search.`,
         });
+      }
       await answer(req, settings, abort.signal, emit);
     } catch (e) {
       emit({ type: "failure", message: e instanceof Error ? e.message : String(e) });

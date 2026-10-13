@@ -4,15 +4,23 @@ Hunch is a browser extension that finds the paragraph on a web page that answers
 
 ## What is sent, and when
 
-When you open the Hunch bar on a page and type a search, the text of that page and your search are sent to TypeSafe AI (`api.typesafe.ai`) so that its model can score each paragraph. Nothing is sent before you open the bar, and nothing is sent from pages where you have not opened it. Closing the bar stops any request in flight.
+When you explicitly submit a search while the Hunch bar is open, text from the selected scope (whole page, article or current selection), your query and any conditions are sent to your selected provider: TypeSafe AI (`api.typesafe.ai`), OpenRouter (`openrouter.ai`) or OpenLux (`api.openlux.ai`). All routes use Jev to score each paragraph. Nothing is sent before you open the bar, and nothing is sent from pages where you have not opened it. Closing the bar cancels the client request. Requests already received by the provider may still be processed or billed. Typing alone does not submit a search.
 
 The page's URL and title are included with the text so the model has context. Your API key is sent in the request's authorization header.
 
-TypeSafe's handling of that data is governed by their own policies at <https://typesafe.ai/legal/privacy-policy>. Hunch has no server of its own: requests go directly from your browser to TypeSafe.
+TypeSafe's handling of that data is governed by their own policies at <https://typesafe.ai/legal/privacy-policy>. When you choose OpenRouter, requests go through OpenRouter to TypeSafe; OpenRouter's policy is at <https://openrouter.ai/privacy>. Hunch has no server of its own.
+
+When you choose OpenLux, requests go to OpenLux for relay to the model provider. OpenLux's policy is at <https://www.openlux.ai/policies/privacy>.
+
+The settings page also requests the selected provider's model list. OpenRouter's public model list is fetched without your key or page content. TypeSafe's model list uses your TypeSafe key. OpenLux's model choices are local and do not make a model-list request.
 
 ## What is stored
 
-Your TypeSafe API key and your chosen model are stored in the browser's extension storage on your device. They are not synced anywhere by Hunch and are not sent to anyone other than TypeSafe.
+Your API keys and chosen models are stored separately for each provider in the browser's extension storage on your device. They are not synced anywhere by Hunch. A key is only sent to the provider it belongs to. Switching providers does not copy a key to the other provider.
+
+Saved excerpts include only the original text you choose to save, page title and URL, section heading, search query or conditions, scope and saving time. They stay in extension local storage until you delete them or uninstall the extension. They are not sent along with later searches and are not synced to a cloud service. Copy and Markdown export happen only when you click those actions.
+
+The excerpt sidebar uses a closed shadow root so ordinary page scripts cannot read saved excerpts through the host page DOM. Do not save sensitive excerpts on shared browser profiles.
 
 ## What is not collected
 
@@ -20,7 +28,7 @@ Hunch has no analytics, no telemetry, no crash reporting, no accounts, and no tr
 
 ## Permissions
 
-- **Access to `api.typesafe.ai`**: to send searches. Requested the first time you save a key or open the bar.
+- **Access to `api.typesafe.ai`, `openrouter.ai` and `api.openlux.ai`**: to send searches to the selected provider and list its models where needed.
 - **Active tab and scripting**: to read the text of the page you invoked Hunch on and draw the highlights.
 - **Storage**: to keep your key and model choice.
 

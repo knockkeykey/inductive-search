@@ -1,14 +1,18 @@
 :host {
   all: initial;
+  --hunch-bar-height: 104px;
   position: fixed;
   inset: 0;
   z-index: 2147483647;
   pointer-events: none;
   display: none;
   font:
-    13px / 1.4 -apple-system,
-    system-ui,
+    14px / 1.5 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "PingFang SC",
     sans-serif;
+  color: #fbfbfe;
   color-scheme: dark;
 }
 :host(.hunch-open) {
@@ -17,62 +21,122 @@
 * {
   box-sizing: border-box;
 }
-
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: preserve hidden behavior after component display rules */
+  display: none !important;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+select {
+  cursor: pointer;
+}
+button {
+  border: 1px solid #52525e;
+  border-radius: 5px;
+  background: #2b2a33;
+  color: #fbfbfe;
+  padding: 5px 9px;
+  line-height: 1.4;
+}
+button:hover {
+  background: #3a3944;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+button:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+input,
+select,
+textarea {
+  min-width: 0;
+  border: 1px solid #52525e;
+  border-radius: 5px;
+  background: #2b2a33;
+  color: #fbfbfe;
+  padding: 7px 10px;
+  margin: 0;
+}
+input:focus,
+textarea:focus {
+  border-color: #fbbf24;
+  outline: 1px solid #fbbf24;
+}
 .hunch-bar {
   pointer-events: auto;
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 18px calc(10px + env(safe-area-inset-bottom, 0px));
   background: #1c1b22;
-  color: #fbfbfe;
-  border-top: 1px solid #3a3944;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+  border-top: 1px solid #52525e;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+}
+.hunch-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .hunch-input {
-  flex: 1 1 200px;
-  min-width: 0;
-  font: inherit;
-  color: #fbfbfe;
-  background: #2b2a33;
-  border: 1px solid #52525e;
-  border-radius: 4px;
-  padding: 5px 10px;
-  max-width: 360px;
-  outline: none;
-  margin: 0;
+  flex: 1;
 }
-.hunch-input:focus {
+.hunch-conditions {
+  display: block;
+  resize: vertical;
+  width: 100%;
+  max-height: 220px;
+  margin-top: 9px;
+}
+.hunch-submit {
+  background: #fbbf24;
   border-color: #fbbf24;
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25);
+  color: #1c1b22;
+  font-weight: 650;
+  padding: 7px 17px;
+}
+.hunch-submit:hover {
+  background: #fcd66b;
+}
+.hunch-close {
+  border: 0;
+  background: transparent;
+  color: #a8a7b3;
+  font-size: 17px;
+}
+.hunch-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
 }
 .hunch-counter {
-  min-width: 110px;
+  min-width: 72px;
   font-variant-numeric: tabular-nums;
 }
 .hunch-nav {
-  font: 11px / 1 sans-serif;
-  color: #fbfbfe;
-  background: #2b2a33;
-  border: 1px solid #52525e;
-  border-radius: 4px;
-  padding: 5px 8px;
-  cursor: pointer;
-  margin: 0;
+  white-space: nowrap;
 }
-.hunch-nav:hover {
-  background: #3a3944;
+.hunch-status .hunch-nav {
+  padding: 2px 7px;
 }
 .hunch-verdict {
-  font-weight: 600;
+  font-weight: 550;
 }
 .hunch-found {
-  color: #3fe1b0;
+  color: #73ddb8;
 }
 .hunch-absent,
 .hunch-error {
@@ -83,21 +147,8 @@
 }
 .hunch-meta {
   color: #a8a7b3;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
   margin-left: auto;
-}
-.hunch-close {
-  font: inherit;
-  color: #a8a7b3;
-  background: none;
-  border: 0;
-  cursor: pointer;
-  padding: 2px 6px;
-  margin: 0;
-}
-.hunch-close:hover {
-  color: #fbfbfe;
+  font-variant-numeric: tabular-nums;
 }
 .hunch-progress {
   position: absolute;
@@ -107,21 +158,167 @@
   height: 2px;
 }
 .hunch-progress-fill {
-  height: 100%;
   width: 0;
+  height: 100%;
   background: #80bfff;
-  transition: width 0.15s;
   opacity: 0;
+  transition: width 0.15s;
 }
 .hunch-progress.hunch-active .hunch-progress-fill {
   opacity: 1;
 }
-
+.hunch-sidebar {
+  pointer-events: auto;
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  bottom: calc(var(--hunch-bar-height) + 16px);
+  width: 390px;
+  display: flex;
+  flex-direction: column;
+  background: #1c1b22;
+  border: 1px solid #52525e;
+  border-radius: 9px;
+  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+.hunch-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 8px;
+}
+.hunch-sidebar-title strong {
+  font-size: 20px;
+}
+.hunch-sidebar-title span {
+  font-size: 12px;
+  color: #a8a7b3;
+  flex: 1;
+}
+.hunch-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px 12px;
+  border-bottom: 1px solid #3a3944;
+}
+.hunch-tabs button {
+  flex: 1;
+  border-color: transparent;
+}
+.hunch-tabs [aria-pressed="true"] {
+  color: #fbbf24;
+  border-color: #86703a;
+  background: #373125;
+}
+.hunch-notice {
+  font-size: 12px;
+  color: #fcd66b;
+  padding: 0 16px;
+}
+.hunch-notice:not(:empty) {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #3a3944;
+}
+.hunch-result-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hunch-result {
+  padding: 15px 16px;
+  border-bottom: 1px solid #3a3944;
+}
+.hunch-selected {
+  border-left: 3px solid #fbbf24;
+  padding-left: 13px;
+  background: #26242b;
+}
+.hunch-result-pick {
+  display: block;
+  text-align: left;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  width: 100%;
+}
+.hunch-result-pick:hover {
+  background: transparent;
+}
+.hunch-result-heading {
+  display: block;
+  font-size: 12px;
+  color: #a8a7b3;
+  margin-bottom: 6px;
+}
+.hunch-score {
+  display: block;
+  color: #fcd66b;
+  font-size: 12px;
+  margin-bottom: 9px;
+}
+.hunch-excerpt-text {
+  display: block;
+  margin: 0;
+  font:
+    16px / 1.8 Georgia,
+    "Songti SC",
+    serif;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.hunch-result-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+}
+.hunch-result-actions button {
+  font-size: 12px;
+}
+.hunch-condition-evidence {
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #d1c7a5;
+  font-size: 12px;
+}
+.hunch-condition-evidence li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.hunch-empty {
+  padding: 28px 22px;
+  margin: 0;
+  line-height: 1.8;
+  color: #a8a7b3;
+}
+.hunch-source {
+  display: block;
+  color: #80bfff;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
+}
+.hunch-saved-date {
+  font-size: 11px;
+  color: #a8a7b3;
+  margin: 10px 0 0;
+}
+.hunch-export {
+  margin: 12px 16px;
+}
+.hunch-sidebar-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #3a3944;
+  font-size: 11px;
+  color: #a8a7b3;
+}
 .hunch-marks {
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 34px;
+  bottom: var(--hunch-bar-height);
   width: 14px;
   background: rgba(28, 27, 34, 0.35);
 }
@@ -147,18 +344,30 @@
   right: 0;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 2px;
 }
-
-@media (max-width: 600px) {
+@media (max-width: 700px) {
+  .hunch-controls {
+    flex-wrap: wrap;
+  }
   .hunch-input {
     flex-basis: 100%;
-    max-width: none;
+    order: 1;
+  }
+  .hunch-conditions {
+    font-size: 13px;
+  }
+  .hunch-sidebar {
+    width: min(390px, calc(100vw - 28px));
+    right: 18px;
+    top: 10px;
   }
   .hunch-meta {
-    display: none;
+    flex-basis: 100%;
+    margin-left: 0;
   }
-  .hunch-marks {
-    bottom: 80px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hunch-progress-fill {
+    transition: none;
   }
 }

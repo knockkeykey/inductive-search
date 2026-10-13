@@ -9,11 +9,19 @@ export interface Block {
 
 export const pageText = (blocks: readonly Block[]) => blocks.map((b) => `${b.id}| ${b.text}`).join("\n");
 
+export type SearchMode = "semantic" | "conditions";
+export type SearchScope = "page" | "article" | "selection";
+export type Combination = "all" | "any";
+
 export interface Search {
   url: string;
   title: string;
   blocks: Block[];
   query: string;
+  mode?: SearchMode;
+  conditions?: string[];
+  combination?: Combination;
+  scope?: SearchScope;
 }
 
 export interface Progress {
@@ -23,6 +31,7 @@ export interface Progress {
   total: number;
   failed: number;
   ms: number;
+  conditionScores?: Record<BlockId, number[]>;
 }
 
 export interface Failure {
