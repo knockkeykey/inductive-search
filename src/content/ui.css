@@ -15,8 +15,14 @@
   color: #fbfbfe;
   color-scheme: dark;
 }
-:host(.hunch-open) {
+:host(.hunch-open),
+:host(.hunch-popover-open) {
   display: block;
+}
+:host(.hunch-popover-open:not(.hunch-open)) .hunch-bar,
+:host(.hunch-popover-open:not(.hunch-open)) .hunch-sidebar,
+:host(.hunch-popover-open:not(.hunch-open)) .hunch-marks {
+  display: none;
 }
 * {
   box-sizing: border-box;
@@ -71,6 +77,50 @@ input:focus,
 textarea:focus {
   border-color: #fbbf24;
   outline: 1px solid #fbbf24;
+}
+.hunch-selection-popover {
+  pointer-events: auto;
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(460px, calc(100vw - 20px));
+  padding: 8px;
+  border: 1px solid #52525e;
+  border-radius: 10px;
+  background: #1c1b22;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+}
+.hunch-selection-title {
+  flex: none;
+  padding: 0 4px;
+  color: #fcd66b;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.hunch-selection-question {
+  flex: 1;
+  width: 0;
+  background: #2b2a33;
+}
+.hunch-selection-ask {
+  flex: none;
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #1c1b22;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.hunch-selection-ask:hover {
+  background: #fcd66b;
+}
+.hunch-selection-close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: #a8a7b3;
+  font-size: 17px;
 }
 .hunch-bar {
   pointer-events: auto;

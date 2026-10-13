@@ -4,13 +4,13 @@ import browser from "webextension-polyfill";
 const COMMAND = "_execute_action";
 
 export async function shortcutLabel(): Promise<string> {
-  if (!browser.commands) return "the toolbar button"; // iOS Safari has no keyboard shortcuts at all
+  if (!browser.commands) return "工具栏按钮"; // iOS Safari has no keyboard shortcuts at all
   const [command, platform] = await Promise.all([
     browser.commands.getAll().then((all) => all.find((c) => c.name === COMMAND)),
     browser.runtime.getPlatformInfo(),
   ]);
   const bound = command?.shortcut;
-  if (!bound) return "the toolbar button";
+  if (!bound) return "工具栏按钮";
 
   const mac = platform.os === "mac";
   return bound

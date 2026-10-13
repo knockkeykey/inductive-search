@@ -2,7 +2,7 @@
   "name": "inductive-search",
   "version": "1.1.0",
   "private": true,
-  "description": "Inductive search: condition search, scoped source results and local excerpts, based on Hunch",
+  "description": "感应式搜索：按条件查找网页原文，查看限定范围的搜索结果，并保存本地摘录。基于 Hunch。",
   "author": "tymscar",
   "license": "MIT",
   "repository": {

@@ -41,7 +41,7 @@ async function unavailable(tabId: number) {
   await browser.action.setBadgeText({ tabId, text: "n/a" });
   await browser.action.setTitle({
     tabId,
-    title: "感应式搜索 can't run here: the browser blocks extensions on this page",
+    title: "感应式搜索无法在此页面运行：浏览器禁止扩展访问此页面",
   });
   setTimeout(() => void browser.action.setBadgeText({ tabId, text: "" }), 2500);
 }
@@ -80,13 +80,13 @@ browser.runtime.onConnect.addListener((port) => {
       const settings = await loadSettings();
       if (!settings.apiKey) {
         void browser.runtime.openOptionsPage();
-        return emit({ type: "failure", message: "No API key yet. Paste one in the settings tab that just opened." });
+        return emit({ type: "failure", message: "尚未设置 API 密钥。请在刚打开的设置页面中粘贴密钥。" });
       }
       if (!(await hasApiAccess(settings.provider))) {
         void browser.runtime.openOptionsPage();
         return emit({
           type: "failure",
-          message: `感应式搜索 needs permission to reach ${PROVIDERS[settings.provider].name}. In the settings tab, click Save and allow access, then retry your search.`,
+          message: `感应式搜索需要访问 ${PROVIDERS[settings.provider].name}。请在设置页面点击“保存”并允许访问，然后重试搜索。`,
         });
       }
       await answer(req, settings, abort.signal, emit);

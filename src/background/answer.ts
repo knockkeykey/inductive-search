@@ -22,7 +22,7 @@ export async function answer(
   const client = createClient(settings);
   const conditions = req.mode === "conditions" ? (req.conditions ?? []) : [];
   if (req.mode === "conditions" && (!conditions.length || conditions.length > MAX_CONDITIONS)) {
-    throw new Error(`Please enter between 1 and ${MAX_CONDITIONS} conditions.`);
+    throw new Error(`请输入 1 至 ${MAX_CONDITIONS} 个条件。`);
   }
   // OpenLux lists a 32k-token context. Leave more room for the per-block questions.
   const budget =
@@ -84,7 +84,7 @@ export async function answer(
             a.noul > 1
           ) {
             throw new Error(
-              `${PROVIDERS[settings.provider].name} returned an invalid Jev probability for ${questionId}.`,
+              `${PROVIDERS[settings.provider].name} 返回了无效的 Jev 概率（${questionId}）。`,
             );
           }
           return a.noul;
@@ -105,7 +105,7 @@ export async function answer(
     report();
   });
   if (!signal.aborted && failed === chunks.length) {
-    throw firstError instanceof Error ? firstError : new Error("All search requests failed.");
+    throw firstError instanceof Error ? firstError : new Error("所有搜索请求均失败。");
   }
 }
 

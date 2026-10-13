@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head><meta charset="utf-8"><title>感应式搜索设置</title>
 <style>
   body { font: 15px/1.5 -apple-system, system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #111; }
@@ -17,20 +17,20 @@
 </style></head>
 <body>
   <h1>感应式搜索</h1>
-  <p>The page text, URL, title and query are sent to your selected provider only while the find bar is open.</p>
-  <label>API provider <select id="provider" disabled><option value="typesafe">TypeSafe (official)</option><option value="openrouter">OpenRouter (Jev)</option><option value="openlux">OpenLux (Jev)</option></select></label>
-  <p id="nokey" style="display:none;padding:10px 12px;border-radius:6px;background:#fef3c7;color:#92400e">You need an API key before the first search. Create one at <a id="keyLink" href="https://console.typesafe.ai/keys" target="_blank" rel="noreferrer">TypeSafe keys</a>, paste it below, and save.</p>
-  <label><span id="keyLabel">TypeSafe API key</span> <input id="apiKey" type="password" placeholder="apikey_…" autocomplete="off"></label>
-  <label>Model <small id="modelNote"></small>
+  <p>仅当查找栏打开并提交搜索时，页面文字、网址、标题和搜索内容才会发送给你选择的服务商。</p>
+  <label>API 服务商 <select id="provider" disabled><option value="typesafe">TypeSafe（官方）</option><option value="openrouter">OpenRouter（Jev）</option><option value="openlux">OpenLux（Jev）</option></select></label>
+  <p id="nokey" style="display:none;padding:10px 12px;border-radius:6px;background:#fef3c7;color:#92400e">首次搜索前需要 API 密钥。请前往 <a id="keyLink" href="https://console.typesafe.ai/keys" target="_blank" rel="noreferrer">TypeSafe 密钥</a>创建密钥，粘贴到下方并保存。</p>
+  <label><span id="keyLabel">TypeSafe API 密钥</span> <input id="apiKey" type="password" placeholder="apikey_…" autocomplete="off"></label>
+  <label>模型 <small id="modelNote"></small>
     <select id="model"></select></label>
-  <small>OpenRouter and OpenLux use Jev's System One API. Chat models such as GPT and Claude are not supported. Each provider keeps its own key and model.</small>
-  <label>Shortcut <small id="shortcutHint">Click the field and press the keys you want.</small>
+  <small>OpenRouter 和 OpenLux 使用 Jev 的 System One API，不支持 GPT、Claude 等聊天模型。每个服务商分别保存自己的密钥和模型。</small>
+  <label>快捷键 <small id="shortcutHint">点击此处并按下想设置的组合键。</small>
     <span class="row">
       <input id="shortcut" type="text" readonly placeholder="…">
-      <button id="resetShortcut" type="button" class="secondary">Reset to default</button>
+      <button id="resetShortcut" type="button" class="secondary">恢复默认</button>
     </span>
     <small id="shortcutNote"></small></label>
-  <button id="save" type="button" disabled>Save</button><span id="saved"></span>
+  <button id="save" type="button" disabled>保存</button><span id="saved"></span>
   <script src="options.js"></script>
 </body>
 </html>

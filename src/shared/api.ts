@@ -60,8 +60,8 @@ export async function listModels(settings: Settings): Promise<ModelChoice[]> {
   if (settings.provider === "openlux") {
     // The dedicated System One docs pin the bare version; the site's generic example adds :stable.
     return [
-      { name: "jev-1.13.0", description: "Jev 1.13.0 (System One)" },
-      { name: "jev-1.13.0:stable", description: "Stable route from the model page example" },
+      { name: "jev-1.13.0", description: "Jev 1.13.0（System One）" },
+      { name: "jev-1.13.0:stable", description: "模型页面示例中的稳定路由" },
     ];
   }
 
@@ -69,16 +69,16 @@ export async function listModels(settings: Settings): Promise<ModelChoice[]> {
   const response = await fetch(`${PROVIDERS.openrouter.baseURL}/v1/models`, {
     signal: AbortSignal.timeout(15_000),
   });
-  if (!response.ok) throw new Error(`OpenRouter model listing failed (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(`OpenRouter 模型列表加载失败（HTTP ${response.status}）。`);
   const body = (await response.json()) as { data?: { id: string; name?: string }[] };
-  if (!Array.isArray(body.data)) throw new Error("Unexpected OpenRouter model list response.");
+  if (!Array.isArray(body.data)) throw new Error("OpenRouter 返回了无法识别的模型列表。");
   const models = body.data
     // Jev Router is a chat-model router, not a System One decision model.
     .filter((m) => typeof m.id === "string" && /^typesafe\/jev-(?:\d|latest)/.test(m.id))
     .map((m) => ({ name: m.id, description: m.name ?? "" }));
   // The public catalog currently omits System One models. Keep documented choices available.
   const choices = new Map<string, ModelChoice>([
-    [PROVIDERS.openrouter.defaultModel, { name: PROVIDERS.openrouter.defaultModel, description: "Latest Jev" }],
+    [PROVIDERS.openrouter.defaultModel, { name: PROVIDERS.openrouter.defaultModel, description: "最新 Jev" }],
     ["typesafe/jev-1.13", { name: "typesafe/jev-1.13", description: "Jev 1.13" }],
   ]);
   for (const model of models) choices.set(model.name, model);

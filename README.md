@@ -1,8 +1,8 @@
-# Inductive search
+# 感应式搜索
 
 浏览器扩展名称：**感应式搜索**。
 
-基于 [tymscar/hunch](https://github.com/tymscar/hunch) 的公开 Fork，由 [knockkeykey](https://github.com/knockkeykey) 维护。本项目保留原作者 **Oscar Molnar（tymscar）** 的代码历史与 MIT 许可证。
+这是基于 [tymscar/hunch](https://github.com/tymscar/hunch) 的公开派生项目，由 [knockkeykey](https://github.com/knockkeykey) 维护。本项目保留原作者 **Oscar Molnar（tymscar）** 的代码历史与 MIT 许可证。
 
 原项目提供由 Jev 驱动的网页段落查找。本分支增加条件筛选、原文结果侧边栏、搜索范围和带来源的本地摘录，并接入 OpenRouter 与 OpenLux。
 
@@ -38,13 +38,13 @@ npm run build
 
 ## 配置 API
 
-打开扩展设置，选择服务商，粘贴该服务商的 Key，点击 Save。
+打开扩展设置，选择服务商，粘贴该服务商的密钥，点击“保存”。
 
-| 服务商 | 获取 Key | 默认模型 | 搜索接口 |
+| 服务商 | 获取密钥 | 默认模型 | 搜索接口 |
 | --- | --- | --- | --- |
-| TypeSafe 官方 | [TypeSafe Console](https://console.typesafe.ai/keys) | `jev-latest` | `https://api.typesafe.ai/v1/systemone` |
-| OpenRouter | [OpenRouter Keys](https://openrouter.ai/settings/keys) | `~typesafe/jev-latest` | `https://openrouter.ai/api/v1/systemone` |
-| OpenLux | [OpenLux Console](https://www.openlux.ai/login) | `jev-1.13.0` | `https://api.openlux.ai/v1/systemone` |
+| TypeSafe 官方 | [TypeSafe 控制台](https://console.typesafe.ai/keys) | `jev-latest` | `https://api.typesafe.ai/v1/systemone` |
+| OpenRouter | [OpenRouter 密钥](https://openrouter.ai/settings/keys) | `~typesafe/jev-latest` | `https://openrouter.ai/api/v1/systemone` |
+| OpenLux | [OpenLux 控制台](https://www.openlux.ai/login) | `jev-1.13.0` | `https://api.openlux.ai/v1/systemone` |
 
 OpenRouter 可固定选择 `typesafe/jev-1.13`，接入依据为 [官方 TypeSafe SDK 指南](https://openrouter.ai/docs/guides/community/typesafe-sdk)。
 
@@ -89,7 +89,7 @@ Jev 为每个条件分别返回判断分数。全部满足取最低分、任一�
 
 - **整页**：页面可提取的可见文字，包括导航和推荐区域。
 - **仅正文**：优先提取 `article`，其次 `main` / 主内容区域；没有明确正文结构时使用整页并排除语义导航区域。自动识别可能不准确。
-- **当前选区**：先在网页上选中文字，再打开感应式搜索或选择这个范围。只提交选中的文字，保留其原文位置用于跳转。
+- **当前选区**：在网页上划选文字后，可从悬浮栏直接提问；也可打开感应式搜索，再选择这个范围。只提交选中的文字，保留其原文位置用于跳转。
 
 每次提交都会重新提取范围内文字。尚未加载的内容、iframe 内部和封闭 Shadow DOM 内容不在提取范围中。
 

@@ -140,6 +140,14 @@ export class FindBar {
   setPanelOpen(open: boolean) {
     this.panelButton.setAttribute("aria-expanded", String(open));
   }
+  setQuestionForSelection(question: string) {
+    this.mode.value = "semantic";
+    this.input.hidden = false;
+    this.conditions.hidden = true;
+    this.combination.hidden = true;
+    this.scope.value = "selection";
+    this.input.value = question;
+  }
   set(status: Status) {
     if (status.counter !== undefined) this.counter.textContent = status.counter;
     if (status.meta !== undefined) this.meta.textContent = status.meta;

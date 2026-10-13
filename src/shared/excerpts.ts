@@ -25,9 +25,9 @@ export type ExcerptResponse = { ok: true; excerpts: Excerpt[] } | { ok: false; e
 
 export function validateExcerpt(draft: ExcerptDraft): ExcerptDraft {
   const url = new URL(draft.url);
-  if (!["https:", "http:"].includes(url.protocol)) throw new Error("Only web-page sources can be saved.");
+  if (!["https:", "http:"].includes(url.protocol)) throw new Error("只能保存网页来源。");
   if (typeof draft.text !== "string" || !draft.text.trim() || draft.text.length > 20_000) {
-    throw new Error("An excerpt must contain between 1 and 20,000 characters.");
+    throw new Error("摘录长度必须为 1 至 20,000 个字符。");
   }
   const line = (value: string) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 1_000) : "");
   return {

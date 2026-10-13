@@ -4,6 +4,7 @@ import { captureSelection, extractBlocks, type PageBlock } from "./content/block
 import { clearPaint, type Hit, markCurrent, paint, rankHits } from "./content/hits";
 import { ScrollMarks } from "./content/marks";
 import { ResultsSidebar } from "./content/sidebar";
+import { SelectionPopover } from "./content/selection-popover";
 import {
   type Excerpt,
   type ExcerptDraft,
@@ -35,6 +36,7 @@ class Hunch {
     onClose: () => this.setPanel(false),
   });
   private readonly marks = new ScrollMarks((hit) => this.goTo(hit));
+  private selectionPopover!: SelectionPopover;
   private blocks: PageBlock[] = [];
   private ranges: Range[] = [];
   private hits: Hit[] = [];
@@ -51,6 +53,9 @@ class Hunch {
     // Saved excerpts from other pages must not be readable through the host page's DOM.
     this.shadow = this.host.attachShadow({ mode: "closed" });
     this.shadow.append(style, this.bar.root, this.sidebar.root, this.marks.root);
+    this.selectionPopover = new SelectionPopover(this.shadow, this.host, {
+      onAsk: (question, ranges) => this.askSelection(question, ranges),
+    });
     new ResizeObserver(() =>
       this.host.style.setProperty("--hunch-bar-height", `${this.bar.root.getBoundingClientRect().height}px`),
     ).observe(this.bar.root);
@@ -58,7 +63,16 @@ class Hunch {
     window.addEventListener("resize", () => this.marks.draw(this.hits, this.current));
     document.addEventListener("selectionchange", () => {
       const ranges = captureSelection();
-      if (ranges.length) this.ranges = ranges;
+      if (ranges.length) {
+        this.ranges = ranges;
+        if (this.bar.controls().scope === "selection") {
+          const characters = ranges.reduce((count, range) => count + range.toString().length, 0);
+          this.bar.set({
+            verdict: { text: `已选中 ${characters} 个字符，可搜索当前选区。`, tone: "none" },
+          });
+        }
+      }
+      this.selectionPopover.selectionChanged(ranges);
     });
   }
   get isOpen() {
@@ -75,6 +89,7 @@ class Hunch {
   }
   close() {
     this.host.classList.remove("hunch-open");
+    this.selectionPopover.hide();
     this.abort();
     this.reset();
   }
@@ -103,9 +118,12 @@ class Hunch {
     const controls = this.bar.controls();
     this.blocks = extractBlocks(controls.scope, this.ranges);
     this.reset();
-    if (controls.scope === "selection" && !this.blocks.length) {
-      this.bar.set({ verdict: { text: "先在网页中选中文字，再选择当前选区。", tone: "none" } });
-    }
+  }
+  private askSelection(question: string, ranges: readonly Range[]) {
+    this.ranges = [...ranges];
+    this.bar.setQuestionForSelection(question);
+    this.open();
+    this.search();
   }
   private search() {
     if (!this.isOpen) return;
@@ -198,7 +216,7 @@ class Hunch {
           : "没有高相关结果";
     return {
       verdict: { text, tone: !finished ? "busy" : progress.failed ? "error" : count ? "found" : "absent" },
-      meta: `${progress.ms} ms · ${progress.done}/${progress.total} 批次${progress.failed ? ` · ${progress.failed} 失败` : ""}`,
+      meta: `${progress.ms} 毫秒 · ${progress.done}/${progress.total} 批次${progress.failed ? ` · ${progress.failed} 失败` : ""}`,
       progress: { done: progress.done, total: progress.total },
       counter: this.counterText(),
     } as const;
@@ -306,13 +324,12 @@ declare global {
 }
 if (!window.__hunchLoaded) {
   window.__hunchLoaded = true;
-  let hunch: Hunch | undefined;
+  const hunch = new Hunch();
   browser.runtime.onMessage.addListener((message: unknown) => {
     switch ((message as TabMessage).type) {
       case "ping":
         return Promise.resolve(true);
       case "toggle":
-        hunch ??= new Hunch();
         hunch.isOpen ? hunch.close() : hunch.open();
     }
   });
