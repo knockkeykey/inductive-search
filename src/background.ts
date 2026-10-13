@@ -39,7 +39,10 @@ async function hasContentScript(tabId: number): Promise<boolean> {
 async function unavailable(tabId: number) {
   await browser.action.setBadgeBackgroundColor({ tabId, color: "#ff5b5b" });
   await browser.action.setBadgeText({ tabId, text: "n/a" });
-  await browser.action.setTitle({ tabId, title: "Hunch can't run here: the browser blocks extensions on this page" });
+  await browser.action.setTitle({
+    tabId,
+    title: "感应式搜索 can't run here: the browser blocks extensions on this page",
+  });
   setTimeout(() => void browser.action.setBadgeText({ tabId, text: "" }), 2500);
 }
 
@@ -51,7 +54,7 @@ browser.action.onClicked.addListener(async (tab) => {
   try {
     await toggle(tab.id);
   } catch (error) {
-    console.error("Hunch activation failed:", error);
+    console.error("感应式搜索 activation failed:", error);
     if (tab.id !== undefined) await unavailable(tab.id);
   }
 });
@@ -83,7 +86,7 @@ browser.runtime.onConnect.addListener((port) => {
         void browser.runtime.openOptionsPage();
         return emit({
           type: "failure",
-          message: `Hunch needs permission to reach ${PROVIDERS[settings.provider].name}. In the settings tab, click Save and allow access, then retry your search.`,
+          message: `感应式搜索 needs permission to reach ${PROVIDERS[settings.provider].name}. In the settings tab, click Save and allow access, then retry your search.`,
         });
       }
       await answer(req, settings, abort.signal, emit);

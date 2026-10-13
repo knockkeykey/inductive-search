@@ -1,5 +1,5 @@
 {
-  description = "hunch: Ctrl+F by meaning, a Firefox/Zen extension powered by TypeSafe AI";
+  description = "Inductive search: find web page text by meaning and conditions, based on Hunch";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   outputs = { self, nixpkgs }:
     let

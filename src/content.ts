@@ -290,7 +290,7 @@ class Hunch {
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `hunch-excerpts-${new Date().toISOString().slice(0, 10)}.md`;
+    link.download = `inductive-search-excerpts-${new Date().toISOString().slice(0, 10)}.md`;
     this.shadow.append(link);
     link.click();
     link.remove();

@@ -1,4 +1,6 @@
-# Hunch 中文增强版
+# Inductive search
+
+浏览器扩展名称：**感应式搜索**。
 
 基于 [tymscar/hunch](https://github.com/tymscar/hunch) 的公开 Fork，由 [knockkeykey](https://github.com/knockkeykey) 维护。本项目保留原作者 **Oscar Molnar（tymscar）** 的代码历史与 MIT 许可证。
 
@@ -22,8 +24,8 @@
 需要 Node.js 20.19+、22.13+ 或 24+（开发依赖的要求）。
 
 ```sh
-git clone https://github.com/knockkeykey/hunch.git
-cd hunch
+git clone https://github.com/knockkeykey/inductive-search.git
+cd inductive-search
 npm ci
 npm run build
 ```
@@ -52,7 +54,7 @@ OpenLux 使用 [Jev 专用 System One 文档](https://doc.openlux.ai/en/referenc
 
 ## 使用
 
-macOS 按 **Option + F**，其他平台默认 **Ctrl + Shift + F**，也可以点击工具栏 Hunch 图标。正常的 Cmd/Ctrl + F 保持不变。
+macOS 按 **Option + F**，其他平台默认 **Ctrl + Shift + F**，也可以点击工具栏「感应式搜索」图标。正常的 Cmd/Ctrl + F 保持不变。
 
 Chrome 的快捷键在 `chrome://extensions/shortcuts` 修改；Firefox 可在扩展设置页修改。
 
@@ -87,7 +89,7 @@ Jev 为每个条件分别返回判断分数。全部满足取最低分、任一�
 
 - **整页**：页面可提取的可见文字，包括导航和推荐区域。
 - **仅正文**：优先提取 `article`，其次 `main` / 主内容区域；没有明确正文结构时使用整页并排除语义导航区域。自动识别可能不准确。
-- **当前选区**：先在网页上选中文字，再打开 Hunch 或选择这个范围。只提交选中的文字，保留其原文位置用于跳转。
+- **当前选区**：先在网页上选中文字，再打开感应式搜索或选择这个范围。只提交选中的文字，保留其原文位置用于跳转。
 
 每次提交都会重新提取范围内文字。尚未加载的内容、iframe 内部和封闭 Shadow DOM 内容不在提取范围中。
 
@@ -102,7 +104,7 @@ Jev 为每个条件分别返回判断分数。全部满足取最低分、任一�
 
 ## 实现原理与边界
 
-Hunch 提取页面文字并分块，给每个块生成 Jev `noul` 问题。后台把网页标题、网址、文字块和问题发给选定服务商，验证返回值后把评分发回网页。界面按阈值 0.4 筛选、排序并高亮原文。
+感应式搜索提取页面文字并分块，给每个块生成 Jev `noul` 问题。后台把网页标题、网址、文字块和问题发给选定服务商，验证返回值后把评分发回网页。界面按阈值 0.4 筛选、排序并高亮原文。
 
 评分反映模型对条件是否满足的判断，不是事实正确率，也不代表关键词出现次数。当前没有精确关键词匹配兜底，因此页面出现某个词也可能没有高相关结果。这个插件定位原文，不生成答案或推理解释。
 

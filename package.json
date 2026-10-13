@@ -1,13 +1,13 @@
 {
-  "name": "hunch",
+  "name": "inductive-search",
   "version": "1.1.0",
   "private": true,
-  "description": "Hunch fork with condition search, scoped source results and local excerpts",
+  "description": "Inductive search: condition search, scoped source results and local excerpts, based on Hunch",
   "author": "tymscar",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/knockkeykey/hunch"
+    "url": "https://github.com/knockkeykey/inductive-search"
   },
   "type": "module",
   "scripts": {

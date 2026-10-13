@@ -72,12 +72,12 @@ export class FindBar {
     );
     const close = element(
       "button",
-      { type: "button", class: "hunch-close", title: "关闭 (Esc)", "aria-label": "关闭 Hunch" },
+      { type: "button", class: "hunch-close", title: "关闭 (Esc)", "aria-label": "关闭感应式搜索" },
       "✕",
     );
     this.root = element(
       "div",
-      { class: "hunch-bar", role: "search", "aria-label": "Hunch 网页查找" },
+      { class: "hunch-bar", role: "search", "aria-label": "感应式搜索网页查找" },
       element(
         "div",
         { class: "hunch-controls" },

@@ -15,7 +15,7 @@ interface Handlers {
 }
 
 export class ResultsSidebar {
-  readonly root = element("aside", { class: "hunch-sidebar", "aria-label": "Hunch 搜索结果与摘录" });
+  readonly root = element("aside", { class: "hunch-sidebar", "aria-label": "感应式搜索结果与摘录" });
   private readonly results = element("div", { class: "hunch-result-list" });
   private readonly saved = element("div", { class: "hunch-result-list" });
   private readonly resultTab = element("button", { type: "button", "aria-pressed": "true" }, "搜索结果");
@@ -34,7 +34,7 @@ export class ResultsSidebar {
       element(
         "div",
         { class: "hunch-sidebar-title" },
-        element("strong", {}, "Hunch"),
+        element("strong", {}, "感应式搜索"),
         element("span", {}, "原文查找与摘录"),
         close,
       ),
