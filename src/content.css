@@ -5,59 +5,99 @@
   initial-value: 0deg;
 }
 
-/* Page-scope highlights. Paragraphs get only a light warm wash, so the marked
-   sentences inside them (a saturated highlighter stroke) carry the emphasis. */
+/* Page-scope highlights, after Notes' highlighter and Safari's find-in-page. Paragraphs get only a
+   faint warm wash; the marked sentences inside them (a saturated highlighter stroke) carry the
+   emphasis. .hunch-dark (set per element by tone.ts) switches to the dark palette. */
 .hunch-hl {
+  --hunch-tint: 255, 204, 0;
+  --hunch-wash: rgba(var(--hunch-tint), var(--hunch-alpha, 0.08));
+  --hunch-ring: rgba(214, 150, 0, 0.75);
+  --hunch-lift: rgba(0, 0, 0, 0.1);
+  --hunch-badge-bg: rgba(255, 255, 255, 0.78);
+  --hunch-badge-fg: rgba(0, 0, 0, 0.78);
+  --hunch-badge-edge: rgba(0, 0, 0, 0.12);
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own background */
-  background: rgba(255, 196, 0, var(--hunch-alpha, 0.14)) !important;
-  box-shadow: 0 0 0 4px rgba(255, 196, 0, var(--hunch-alpha, 0.14));
-  border-radius: 4px;
+  background: var(--hunch-wash) !important;
+  box-shadow: 0 0 0 4px var(--hunch-wash);
+  border-radius: 8px;
   transition:
-    background 0.2s,
-    box-shadow 0.2s;
+    background 0.25s,
+    box-shadow 0.25s;
+}
+.hunch-hl.hunch-dark {
+  --hunch-tint: 255, 214, 10;
+  --hunch-wash: rgba(var(--hunch-tint), calc(var(--hunch-alpha, 0.08) * 1.6));
+  --hunch-ring: rgba(255, 214, 10, 0.7);
+  --hunch-lift: rgba(0, 0, 0, 0.45);
+  --hunch-badge-bg: rgba(44, 44, 46, 0.8);
+  --hunch-badge-fg: rgba(255, 255, 255, 0.9);
+  --hunch-badge-edge: rgba(255, 255, 255, 0.16);
 }
 .hunch-hl.hunch-rel {
   position: relative;
 }
+/* Score badge: a frosted capsule on the top-right corner, shown only for the current or hovered paragraph. */
 .hunch-hl.hunch-rel::after {
   content: attr(data-hunch-p);
   position: absolute;
-  top: -0.95em;
-  right: 2px;
+  top: -4px;
+  right: 4px;
+  translate: 0 -50%;
   font:
-    600 10px / 1 -apple-system,
+    600 10.5px / 1 -apple-system,
     BlinkMacSystemFont,
+    "SF Pro Text",
     sans-serif;
   font-variant-numeric: tabular-nums;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.62);
-  padding: 2px 6px;
+  letter-spacing: 0.01em;
+  color: var(--hunch-badge-fg);
+  background: var(--hunch-badge-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  backdrop-filter: blur(12px) saturate(1.8);
+  box-shadow:
+    0 0 0 0.5px var(--hunch-badge-edge),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+  padding: 4px 7px;
   border-radius: 999px;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
-/* The current paragraph is set apart by a ring, not by a darker fill. */
+.hunch-hl.hunch-rel.hunch-current::after,
+.hunch-hl.hunch-rel.hunch-hover::after,
+.hunch-hl.hunch-rel:hover::after {
+  opacity: 1;
+}
+/* The current paragraph: a fine ring and a soft lift, popped in with a Safari find-style bounce.
+   The ring is an outline so it isn't seen through the translucent wash; the bounce animates only
+   the outline offset and shadows, so the page element's layout is never touched. */
 .hunch-hl.hunch-current {
-  /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own background */
-  background: rgba(255, 196, 0, 0.16) !important;
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own outline */
-  outline: none !important;
+  outline: 1px solid var(--hunch-ring) !important;
+  outline-offset: 4px;
   box-shadow:
-    0 0 0 4px rgba(255, 196, 0, 0.16),
-    0 0 0 5.5px rgba(230, 160, 0, 0.75),
-    0 4px 14px 4px rgba(0, 0, 0, 0.12);
-  animation: hunch-current-pop 0.18s ease-out;
+    0 0 0 4px var(--hunch-wash),
+    0 6px 20px 4px var(--hunch-lift);
+  animation: hunch-current-bounce 0.38s cubic-bezier(0.32, 0.72, 0, 1);
 }
-@keyframes hunch-current-pop {
-  50% {
+@keyframes hunch-current-bounce {
+  40% {
+    outline-offset: 9px;
     box-shadow:
-      0 0 0 7px rgba(255, 196, 0, 0.2),
-      0 0 0 8.5px rgba(230, 160, 0, 0.6),
-      0 6px 18px 6px rgba(0, 0, 0, 0.14);
+      0 0 0 9px var(--hunch-wash),
+      0 8px 26px 6px var(--hunch-lift);
+  }
+  75% {
+    outline-offset: 3px;
+    box-shadow:
+      0 0 0 3px var(--hunch-wash),
+      0 5px 18px 3px var(--hunch-lift);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .hunch-hl,
-  .hunch-hl.hunch-current {
+  .hunch-hl.hunch-current,
+  .hunch-hl.hunch-rel::after {
     animation: none;
     transition: none;
   }
@@ -70,11 +110,12 @@
 
 /* The best sentences inside a hit, drawn over the paragraph highlight (including the opaque current one). */
 /* Drawn in as a pen stroke by sentence-marks.ts; the tip is the ink right behind the pen. */
+/* Safari-style: saturated system yellow with dark text on light and dark pages alike. */
 ::highlight(hunch-sentence) {
-  background-color: rgba(255, 212, 0, 0.92);
+  background-color: rgba(255, 214, 10, 0.92);
   color: #1d1d1f;
 }
 ::highlight(hunch-sentence-tip) {
-  background-color: rgba(255, 170, 0, 0.95);
+  background-color: rgba(255, 159, 10, 0.95);
   color: #1d1d1f;
 }

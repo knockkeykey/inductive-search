@@ -2,9 +2,9 @@ import { element } from "./element";
 import type { Hit } from "./hits";
 import { icon } from "./icons";
 
-const SIZE = 22;
+const SIZE = 20;
 // Room for the score badge that sits on the paragraph's top-right corner.
-const BADGE = 40;
+const BADGE = 46;
 const EDGE = 4;
 
 // A copy button pinned beside the score badge of the hovered paragraph (or the current one).
@@ -20,11 +20,15 @@ export class CopyButton {
   private hits: readonly Hit[] = [];
   private current: Hit | undefined;
   private hovered: HTMLElement | undefined;
+  // Paragraph whose score badge is held visible while the pointer is over this button.
+  private held: HTMLElement | undefined;
   private frame = 0;
   private doneTimer: number | undefined;
 
   constructor(private readonly onCopied: (ok: boolean) => void) {
     this.root.append(icon("copy"));
+    this.root.addEventListener("pointerenter", () => this.hold(this.target));
+    this.root.addEventListener("pointerleave", () => this.hold(undefined));
     this.root.addEventListener("click", () => void this.copy());
     document.addEventListener(
       "pointerover",
@@ -54,6 +58,13 @@ export class CopyButton {
     return hovered ?? this.current?.el;
   }
 
+  // Leaving the paragraph for the button would hide the badge it sits beside; keep it shown.
+  private hold(el: HTMLElement | undefined) {
+    this.held?.classList.remove("hunch-hover");
+    this.held = el;
+    el?.classList.add("hunch-hover");
+  }
+
   private schedule() {
     if (!this.frame) this.frame = requestAnimationFrame(() => this.layout());
   }
@@ -66,8 +77,10 @@ export class CopyButton {
     const visible = rect && rect.bottom > 0 && rect.top < window.innerHeight && rect.width > SIZE + BADGE;
     this.root.hidden = !visible;
     if (!visible) return;
+    // Match the paragraph's palette, which follows the page background rather than the bar theme.
+    this.root.classList.toggle("hunch-copy-dark", !!el?.classList.contains("hunch-dark"));
     const left = Math.min(rect.right - BADGE - SIZE, window.innerWidth - SIZE - EDGE);
-    const top = Math.max(rect.top - SIZE / 2 - 3, EDGE);
+    const top = Math.max(rect.top - 4 - SIZE / 2, EDGE);
     Object.assign(this.root.style, { left: `${Math.max(left, EDGE)}px`, top: `${top}px` });
   }
 

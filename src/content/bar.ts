@@ -75,7 +75,7 @@ export class FindBar {
   private readonly leading = element("span", { class: "hunch-field-icon" }, icon("magnifier"));
   private readonly counter = element("span", { class: "hunch-counter" });
   private readonly stepper: HTMLElement;
-  // Status and errors get their own full-width row so long messages wrap instead of being cut off.
+  // Status and errors share the toolbar's space between scope controls and settings.
   private readonly verdict = element("span", { class: "hunch-verdict", role: "status", "aria-live": "polite" });
   private readonly meta = element("span", { class: "hunch-meta" });
   private readonly status = element("div", { class: "hunch-status" }, this.verdict, this.meta);
@@ -113,6 +113,7 @@ export class FindBar {
   constructor(handlers: BarHandlers) {
     this.conditions = new ConditionList({ onChange: handlers.onChange, onSubmit: handlers.onSubmit });
     this.scope.append(new Option("整页", "page"), new Option("仅正文", "article"), new Option("当前选区", "selection"));
+    this.scope.value = "article";
     this.combination.append(new Option("全部满足", "all"), new Option("任一满足", "any"));
     const submit = element(
       "button",
@@ -143,12 +144,11 @@ export class FindBar {
         this.scope,
         this.scopeButton,
         this.combination,
-        element("span", { class: "hunch-spacer" }),
+        this.status,
         this.retryButton,
         this.refreshButton,
         this.settings.button,
       ),
-      this.status,
       element("div", { class: "hunch-progress" }, this.progress),
     );
     this.paintMode();
@@ -300,7 +300,15 @@ class SettingsPanel {
     },
     icon("gear"),
   );
-  private readonly threshold = element("select", { class: "hunch-chip-select", "aria-label": "相关度阈值" });
+  private readonly threshold = element("input", {
+    type: "range",
+    class: "hunch-range",
+    min: String(THRESHOLDS[0]),
+    max: String(THRESHOLDS[THRESHOLDS.length - 1]),
+    step: "0.1",
+    "aria-label": "相关度阈值",
+  });
+  private readonly thresholdValue = element("output", { class: "hunch-range-value" });
   private readonly refine = element("input", { type: "checkbox", role: "switch", class: "hunch-switch" });
   private readonly sentence = element("input", {
     type: "range",
@@ -311,6 +319,8 @@ class SettingsPanel {
     "aria-label": "句子阈值",
   });
   private readonly sentenceValue = element("output", { class: "hunch-range-value" });
+  // Child of 段内精确定位: indented under it and dimmed while the switch is off.
+  private readonly sentenceRow: HTMLElement;
   private readonly themeButtons = (Object.keys(THEMES) as Theme[]).map((theme) =>
     element(
       "button",
@@ -326,7 +336,6 @@ class SettingsPanel {
 
   constructor() {
     const id = `hunch-settings-${++uid}`;
-    for (const value of THRESHOLDS) this.threshold.append(new Option(value.toFixed(1), String(value)));
     this.help = element(
       "div",
       { class: "hunch-help", id: `${id}-help`, hidden: "" },
@@ -356,6 +365,18 @@ class SettingsPanel {
         element("span", { class: "hunch-setting-label" }, label),
         ...controls,
       );
+    this.sentenceRow = element(
+      "label",
+      { class: "hunch-setting hunch-setting-child" },
+      element(
+        "span",
+        { class: "hunch-setting-label" },
+        "句子阈值",
+        element("span", { class: "hunch-setting-hint" }, "开启段内精确定位后可调"),
+      ),
+      this.sentence,
+      this.sentenceValue,
+    );
     this.root = element(
       "div",
       {
@@ -372,9 +393,8 @@ class SettingsPanel {
         this.helpButton,
       ),
       this.help,
-      row("段落阈值", this.threshold),
-      row("段内精确定位", this.refine),
-      row("句子阈值", this.sentence, this.sentenceValue),
+      row("段落阈值", this.threshold, this.thresholdValue),
+      element("div", { class: "hunch-setting-group" }, row("段内精确定位", this.refine), this.sentenceRow),
       element(
         "div",
         { class: "hunch-setting" },
@@ -392,7 +412,10 @@ class SettingsPanel {
       this.help.hidden = !open;
       this.helpButton.setAttribute("aria-expanded", String(open));
     });
-    this.threshold.addEventListener("change", () => handlers.onThreshold(Number(this.threshold.value)));
+    this.threshold.addEventListener("input", () => {
+      this.paintThresholdValue();
+      handlers.onThreshold(Number(this.threshold.value));
+    });
     this.refine.addEventListener("change", () => handlers.onRefine(this.refine.checked));
     this.sentence.addEventListener("input", () => {
       this.paintSentenceValue();
@@ -434,15 +457,20 @@ class SettingsPanel {
     if (open) this.threshold.focus();
     else if (refocus) this.button.focus();
   }
+  private paintThresholdValue() {
+    this.thresholdValue.textContent = Number(this.threshold.value).toFixed(1);
+  }
   private paintSentenceValue() {
     this.sentenceValue.textContent = Number(this.sentence.value).toFixed(2);
   }
   setThreshold(value: number) {
     this.threshold.value = String(value);
+    this.paintThresholdValue();
   }
   setRefine(on: boolean) {
     this.refine.checked = on;
     this.sentence.disabled = !on;
+    this.sentenceRow.toggleAttribute("data-disabled", !on);
   }
   setSentenceThreshold(value: number) {
     this.sentence.value = String(value);

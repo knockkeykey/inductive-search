@@ -3,6 +3,7 @@ import type { BlockId } from "../shared/protocol";
 import { THRESHOLD } from "../shared/questions";
 import { type Ranked, rank } from "../shared/ranking";
 import { computed, type PageBlock } from "./blocks";
+import { applyTone, clearTone } from "./tone";
 
 export interface Hit extends PageBlock, Partial<Pick<Ranked, "keyword">> {
   p: number;
@@ -42,20 +43,23 @@ export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
     if (painted.has(el)) continue;
     painted.add(el);
     ensureStyles(el);
+    applyTone(el);
     el.classList.add("hunch-hl");
 
     if (computed(el).position === "static") el.classList.add("hunch-rel");
 
-    // Keyword-only hits sit below the threshold; give them the faintest highlight.
+    // Keyword-only hits sit below the threshold; give them the faintest wash. Kept light so the
+    // marked sentences inside carry the emphasis.
     const strength = Math.max(0, (p - threshold) / (1 - threshold));
-    el.style.setProperty("--hunch-alpha", (0.08 + 0.14 * strength).toFixed(2));
+    el.style.setProperty("--hunch-alpha", (0.05 + 0.05 * strength).toFixed(3));
     el.dataset.hunchP = p.toFixed(2);
   }
 }
 
 export function clearPaint() {
   for (const el of [...painted, ...document.querySelectorAll<HTMLElement>(".hunch-hl")]) {
-    el.classList.remove("hunch-hl", "hunch-rel", "hunch-current");
+    el.classList.remove("hunch-hl", "hunch-rel", "hunch-current", "hunch-hover");
+    clearTone(el);
     el.style.removeProperty("--hunch-alpha");
     delete el.dataset.hunchP;
   }

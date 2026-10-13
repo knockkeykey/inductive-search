@@ -104,6 +104,7 @@ test('page/article/selection scopes keep their boundaries and repeated occurrenc
 
 test('find bar submits two-character queries, shows results only on the page and aborts without a delayed search', async () => {
   const dom = domFixture(); const w = dom.window;
+  document.querySelector('article').getBoundingClientRect = () => new w.DOMRect(20, 30, 600, 400);
   const requests = [];
   let toggle; let shadow;
   w.ResizeObserver = class { observe() {} };
@@ -130,7 +131,9 @@ test('find bar submits two-character queries, shows results only on the page and
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(document.querySelector('hunch-ui').shadowRoot, null, 'the search UI uses a closed shadow root');
   const frame = shadow.querySelector('.hunch-scope');
-  assert.ok(!frame.hidden && frame.textContent.includes('整页'), 'the search range is outlined by default while the bar is open');
+  assert.ok(!frame.hidden && frame.textContent.includes('正文'), 'the article search range is outlined by default while the bar is open');
+  assert.equal(shadow.querySelector('[aria-label="搜索范围"]').value, 'article');
+  assert.ok(shadow.querySelector('.hunch-status').hidden, 'idle state does not show the total block count');
   const scopeToggle = shadow.querySelector('[aria-label="标出搜索范围"]');
   scopeToggle.click();
   assert.ok(frame.hidden && scopeToggle.getAttribute('aria-pressed') === 'false');
@@ -148,9 +151,16 @@ test('find bar submits two-character queries, shows results only on the page and
   assert.ok(!help.hidden && help.textContent.includes('段落阈值'), 'the question mark explains the judging rules');
   panel.querySelector('[data-value="light"]').click(); assert.equal(host.dataset.theme, 'light');
   panel.querySelector('[data-value="dark"]').click(); assert.equal(host.dataset.theme, 'dark');
-  panel.querySelector('[data-value="auto"]').click(); assert.equal(host.dataset.theme, 'light', 'auto follows the page background, not the system');
+  panel.querySelector('[data-value="auto"]').click(); assert.equal(host.dataset.theme, 'dark', 'auto contrasts with the light page background, not the system');
   const refineSwitch = panel.querySelector('.hunch-switch');
   assert.ok(refineSwitch.checked, 'in-paragraph locating is on by default');
+  const sentenceRow = panel.querySelector('.hunch-setting-child');
+  assert.ok(sentenceRow.querySelector('[aria-label="句子阈值"]'), 'the sentence threshold is nested under the switch');
+  assert.equal(sentenceRow.parentElement, refineSwitch.closest('.hunch-setting-group'));
+  refineSwitch.click();
+  assert.ok(sentenceRow.hasAttribute('data-disabled') && sentenceRow.querySelector('input').disabled, 'turning the switch off disables its child');
+  refineSwitch.click();
+  assert.ok(!sentenceRow.hasAttribute('data-disabled'));
   panel.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.ok(panel.hidden, 'Escape closes the settings panel');
   const input = shadow.querySelector('input');
@@ -161,6 +171,7 @@ test('find bar submits two-character queries, shows results only on the page and
   input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter' }));
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(requests[0].query, '退款');
+  assert.ok(requests[0].blocks.every(block => !block.text.includes('Navigation') && !block.text.includes('Footer')));
   assert.ok(document.querySelector('.hunch-current'), 'the first result is highlighted on the page');
   assert.ok(!shadow.querySelector('.hunch-sidebar, .hunch-peek'), 'results are not repeated in a card above the bar');
   assert.ok(!shadow.querySelector('[aria-label="已存摘录"], [aria-label="导出结果"]'), 'no excerpt or export controls');
@@ -321,6 +332,8 @@ test('failed batches can be retried alone, the threshold re-ranks locally and ke
   await new Promise(resolve => setImmediate(resolve));
   const input = shadow.querySelector('input');
   input.value = '"selected evidence"'; input.dispatchEvent(new w.Event('input'));
+  const scope = shadow.querySelector('[aria-label="搜索范围"]');
+  scope.value = 'page'; scope.dispatchEvent(new w.Event('change'));
   input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter' }));
   await new Promise(resolve => setImmediate(resolve));
 
@@ -339,7 +352,8 @@ test('failed batches can be retried alone, the threshold re-ranks locally and ke
   assert.ok(counter().endsWith('/ 4'), '0.35 is still below the default threshold');
 
   const threshold = shadow.querySelector('[aria-label="相关度阈值"]');
-  threshold.value = '0.3'; threshold.dispatchEvent(new w.Event('change'));
+  assert.equal(threshold.type, 'range', 'the paragraph threshold is a slider');
+  threshold.value = '0.3'; threshold.dispatchEvent(new w.Event('input'));
   assert.ok(counter().endsWith('/ 6'), 'lowering the threshold shows the borderline blocks');
   assert.equal(requests.length, 2, 'changing the threshold never sends a request');
   dom.window.close();
@@ -386,6 +400,7 @@ test('a finished search closes its port, so a later worker shutdown is not repor
   assert.ok(verdict().textContent.includes('重试'));
   const retry = shadow.querySelector('.hunch-retry');
   assert.ok(!retry.hidden && retry.textContent.includes(`重试 ${rest.length}`), 'only blocks without a score are retried');
-  assert.ok(!shadow.querySelector('.hunch-status').hidden, 'the message has its own status row');
+  assert.ok(!shadow.querySelector('.hunch-status').hidden, 'the message remains visible');
+  assert.equal(shadow.querySelector('.hunch-status').parentElement, shadow.querySelector('.hunch-toolbar'), 'the message is inside the toolbar');
   dom.window.close();
 });

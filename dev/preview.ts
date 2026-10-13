@@ -5,6 +5,7 @@ import { CopyButton } from "../src/content/copy-button";
 import { Dock } from "../src/content/dock";
 import type { Hit } from "../src/content/hits";
 import { ScopeFrame } from "../src/content/scope-frame";
+import { applyTone } from "../src/content/tone";
 
 const host = document.createElement("hunch-ui");
 host.className = "hunch-open";
@@ -28,7 +29,7 @@ const bar = new FindBar({
   onChange: () => scopeOn && scopeFrame.show(bar.controls().scope, []),
   onRefresh: noop,
   onRetry: noop,
-  onScope: noop,
+  onScope: () => scopeOn && scopeFrame.show(bar.controls().scope, []),
   onThreshold: noop,
   onRefine: (on) => bar.setRefine(on),
   onSentenceThreshold: noop,
@@ -44,7 +45,7 @@ const scopeFrame = new ScopeFrame();
 let scopeOn = true;
 const copyButton = new CopyButton((ok) => bar.flash(ok ? "已复制段落。" : "复制失败，请手动选中文字复制。"));
 shadow.append(style, scopeFrame.root, copyButton.root, dock.root);
-scopeFrame.show("page", []);
+scopeFrame.show(bar.controls().scope, []);
 
 const paragraphs = [...document.querySelectorAll<HTMLElement>("article p")];
 const hits = paragraphs.slice(0, 3).map(
@@ -108,9 +109,10 @@ const states: Record<string, () => void> = {
 
 hits[0].el.classList.add("hunch-hl", "hunch-current");
 for (const hit of hits) {
+  applyTone(hit.el);
   hit.el.classList.add("hunch-hl", "hunch-rel");
   hit.el.dataset.hunchP = hit.p.toFixed(2);
-  hit.el.style.setProperty("--hunch-alpha", String(0.08 + 0.14 * hit.p));
+  hit.el.style.setProperty("--hunch-alpha", (0.05 + 0.05 * hit.p).toFixed(3));
 }
 copyButton.update(hits, hits[0]);
 
@@ -137,12 +139,17 @@ for (const name of Object.keys(states)) {
   button.addEventListener("click", states[name]);
   toolbar.append(button);
 }
+// Highlights pick their palette from the page background, so re-tone them when it changes.
+function setPage(name: string | undefined) {
+  document.body.dataset.page = name;
+  for (const hit of hits) applyTone(hit.el);
+  copyButton.update(hits, hits[0]);
+}
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-page]"))
-  button.addEventListener("click", () => {
-    document.body.dataset.page = button.dataset.page;
-  });
+  button.addEventListener("click", () => setPage(button.dataset.page));
 states.results();
 for (const name of location.hash.slice(1).split(",").filter(Boolean)) {
+  // "page-dark" etc. picks the page background; "dark" alone is the bar's dark state.
   if (name in states) states[name]();
-  else document.body.dataset.page = name;
+  else setPage(name.replace(/^page-/, ""));
 }

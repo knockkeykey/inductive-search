@@ -213,9 +213,10 @@ class Hunch {
     else if (resentence) this.refineTop();
     this.paintScope();
   }
-  // 自动 follows the page, not the system: a dark site gets the dark bar even on a light Mac.
+  // 自动 contrasts with the page, not the system: a light site gets the dark bar so it stands off the content.
   private applyTheme() {
-    this.host.dataset.theme = this.prefs.theme === "auto" ? pageTheme() : this.prefs.theme;
+    this.host.dataset.theme =
+      this.prefs.theme === "auto" ? (pageTheme() === "light" ? "dark" : "light") : this.prefs.theme;
   }
   // Outlines the search range for as long as the bottom bar is up.
   private paintScope() {
@@ -240,7 +241,7 @@ class Hunch {
     this.copyButton.update([], undefined);
     this.bar.set({
       counter: "",
-      meta: `${this.blocks.length} 个文字块`,
+      meta: "",
       verdict: { text: "", tone: "none" },
       progress: { done: 0, total: 0 },
     });
@@ -369,7 +370,7 @@ class Hunch {
     if (scope === "selection") return;
     if (!req) {
       this.blocks = extractBlocks(scope, this.ranges);
-      return this.bar.set({ meta: `${this.blocks.length} 个文字块` });
+      return;
     }
     if (this.searching || req.scope !== scope) return;
     const known = new Map<HTMLElement, Set<string>>();

@@ -344,8 +344,7 @@ textarea::placeholder {
   align-items: flex-start;
   padding-left: 12px;
 }
-.hunch-multiline .hunch-command > button,
-.hunch-multiline .hunch-stepper {
+.hunch-multiline .hunch-command > button {
   margin-top: 7px;
 }
 .hunch-grabber {
@@ -394,10 +393,8 @@ textarea::placeholder {
     0 4px 12px rgba(0, 0, 0, 0.1);
 }
 .hunch-stepper {
-  margin-top: 7px;
-}
-.hunch-stepper {
   flex: none;
+  margin-top: 7px;
   display: inline-flex;
   align-items: center;
   height: 30px;
@@ -502,18 +499,18 @@ textarea::placeholder {
 .hunch-scope-toggle[aria-pressed="false"]:hover {
   color: var(--hunch-label);
 }
-.hunch-spacer {
-  flex: 1;
+.hunch-settings-toggle {
+  margin-left: auto;
 }
-/* Full-width status row under the toolbar: messages wrap and can be selected and copied. */
+/* Toolbar status: long messages wrap within the space between the controls. */
 .hunch-status {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 10px;
-  margin: 0 -6px -6px;
-  padding: 6px 14px 8px;
-  border-top: 0.5px solid var(--hunch-separator);
+  padding: 0 4px;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--hunch-secondary-label);
@@ -539,7 +536,9 @@ textarea::placeholder {
   color: var(--hunch-accent);
 }
 .hunch-meta {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--hunch-tertiary-label);
   font-variant-numeric: tabular-nums;
 }
@@ -646,27 +645,48 @@ textarea::placeholder {
   margin-top: 3px;
 }
 
-/* Copy button beside a paragraph's score badge; styled like the badge so it reads as part of the highlight. */
+/* Copy button beside a paragraph's score badge; the same frosted capsule as the badge, so it reads as part of the highlight.
+   Its palette follows the paragraph (.hunch-copy-dark mirrors .hunch-dark), not the bar theme. */
 .hunch-copy {
   pointer-events: auto;
   position: fixed;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border-radius: 999px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.62);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  color: rgba(0, 0, 0, 0.72);
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  backdrop-filter: blur(12px) saturate(1.8);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 .hunch-copy:hover {
-  background: rgba(0, 0, 0, 0.8);
+  color: rgba(0, 0, 0, 0.9);
+  background: rgba(255, 255, 255, 0.95);
+}
+.hunch-copy.hunch-copy-dark {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(44, 44, 46, 0.8);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.hunch-copy.hunch-copy-dark:hover {
+  color: #fff;
+  background: rgba(58, 58, 60, 0.92);
 }
 .hunch-copy.hunch-copy-done {
+  color: #fff;
   background: var(--hunch-green);
 }
 .hunch-copy .hunch-icon {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   stroke-width: 1.75;
 }
 .hunch-copy-buffer {
@@ -691,15 +711,15 @@ textarea::placeholder {
   width: 8px;
   height: 3px;
   border-radius: 2px;
-  background: #ffcc00;
-  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.2);
+  background: light-dark(#ffcc00, #ffd60a);
+  box-shadow: 0 0 0 0.5px light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.5));
   cursor: pointer;
 }
 .hunch-mark-current {
   right: 1px;
   width: 10px;
   height: 5px;
-  background: #ff9500;
+  background: light-dark(#ff9500, #ff9f0a);
 }
 .hunch-viewport {
   position: absolute;
@@ -785,12 +805,55 @@ textarea::placeholder {
   width: 120px;
   accent-color: var(--hunch-accent);
 }
-.hunch-range:disabled,
-.hunch-range:disabled + .hunch-range-value {
+.hunch-range-value {
   width: 32px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--hunch-secondary-label);
+}
+.hunch-setting-group {
+  border-top: 0.5px solid var(--hunch-separator);
+}
+.hunch-setting-group > .hunch-setting:first-child {
+  border-top: 0;
+}
+/* Child setting: indented under its switch with an elbow connector, dimmed while the switch is off. */
+.hunch-setting-child {
+  position: relative;
+  margin-left: 6px;
+  padding-left: 18px;
+  border-top: 0;
+  transition: opacity 0.2s;
+}
+.hunch-setting-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -4px;
+  width: 10px;
+  height: 50%;
+  border-left: 1.5px solid var(--hunch-separator);
+  border-bottom: 1.5px solid var(--hunch-separator);
+  border-bottom-left-radius: 6px;
+}
+.hunch-setting-hint {
+  display: none;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--hunch-tertiary-label);
+}
+.hunch-setting-child[data-disabled] {
+  opacity: 0.45;
+}
+.hunch-setting-child[data-disabled] .hunch-setting-label {
+  display: flex;
+  flex-direction: column;
+}
+.hunch-setting-child[data-disabled] .hunch-setting-hint {
+  display: block;
+}
+.hunch-range:disabled {
+  cursor: not-allowed;
 }
 .hunch-switch {
   appearance: none;
