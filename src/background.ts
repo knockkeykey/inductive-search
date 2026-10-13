@@ -4,7 +4,49 @@ import { PROVIDERS } from "./shared/api";
 import { documentKind, VIEWER_PAGE, viewerQuery } from "./shared/documents";
 import { hasContentScript, injectContentScript, sendToTab } from "./shared/inject";
 import { type Refine, type RefineResult, SEARCH_PORT, type Search, type SearchEvent } from "./shared/protocol";
-import { hasApiAccess, loadSettings } from "./shared/settings";
+import { hasApiAccess, loadSettings, type Settings } from "./shared/settings";
+
+// Settings and the provider permission, read once and reused by every search and refine until
+// either changes. A woken worker starts empty and reads them again.
+interface Access {
+  settings: Settings;
+  allowed: boolean;
+}
+let access: Promise<Access> | undefined;
+const loadAccess = () => {
+  access ??= (async () => {
+    const settings = await loadSettings();
+    return { settings, allowed: Boolean(settings.apiKey) && (await hasApiAccess(settings.provider)) };
+  })();
+  // A failed read is not cached.
+  access.catch(() => {
+    access = undefined;
+  });
+  return access;
+};
+const forgetAccess = () => {
+  access = undefined;
+};
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && "settings" in changes) forgetAccess();
+});
+browser.permissions.onAdded?.addListener(forgetAccess);
+browser.permissions.onRemoved?.addListener(forgetAccess);
+
+// Opens the connection to the provider before the first search needs it (DNS, TLS), so the
+// search request doesn't pay for the handshake. Nothing from the page is sent.
+const WARM_INTERVAL_MS = 60_000;
+let warmedAt = 0;
+async function warm() {
+  const { settings, allowed } = await loadAccess();
+  if (!allowed || Date.now() - warmedAt < WARM_INTERVAL_MS) return;
+  warmedAt = Date.now();
+  await fetch(PROVIDERS[settings.provider].baseURL, {
+    method: "HEAD",
+    cache: "no-store",
+    signal: AbortSignal.timeout(5_000),
+  }).catch(() => undefined);
+}
 
 async function toggle(tab: browser.Tabs.Tab) {
   const tabId = tab.id;
@@ -65,12 +107,20 @@ browser.action.onClicked.addListener(async (tab) => {
   }
 });
 
-// Sentence scores for one hit. Never throws: without them the paragraph highlight stays as it is.
-browser.runtime.onMessage.addListener((message: unknown): Promise<RefineResult> | undefined => {
-  if ((message as { type?: string })?.type !== "refine") return undefined;
+// Sentence scores for the top hits. Never throws: without them the paragraph highlights stay as they are.
+browser.runtime.onMessage.addListener((message: unknown): Promise<RefineResult | undefined> | undefined => {
+  const type = (message as { type?: string })?.type;
+  // The content script sends this when the bar opens, so the worker is awake and the
+  // connection is ready by the time the user submits.
+  if (type === "warm")
+    return warm().then(
+      () => undefined,
+      () => undefined,
+    );
+  if (type !== "refine") return undefined;
   return (async () => {
-    const settings = await loadSettings();
-    if (!settings.apiKey || !(await hasApiAccess(settings.provider))) return { scores: {} };
+    const { settings, allowed } = await loadAccess();
+    if (!allowed) return { scores: {} };
     return refine(message as Refine, settings);
   })().catch(() => ({ scores: {} }));
 });
@@ -90,12 +140,12 @@ browser.runtime.onConnect.addListener((port) => {
 
   async function run(req: Search) {
     try {
-      const settings = await loadSettings();
+      const { settings, allowed } = await loadAccess();
       if (!settings.apiKey) {
         void browser.runtime.openOptionsPage();
         return emit({ type: "failure", message: "尚未设置 API 密钥。请在刚打开的设置页面中粘贴密钥。" });
       }
-      if (!(await hasApiAccess(settings.provider))) {
+      if (!allowed) {
         void browser.runtime.openOptionsPage();
         return emit({
           type: "failure",

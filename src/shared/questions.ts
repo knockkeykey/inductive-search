@@ -6,6 +6,8 @@ export const MAX_CHUNK_BLOCKS = 200;
 export const MAX_BLOCK_CHARS = 1_500;
 export const MIN_BLOCK_CHARS = 12;
 export const MAX_CONCURRENT_REQUESTS = 4;
+// Batches at or above this size are not retried after a timeout.
+export const LARGE_CHUNK_CHARS = 8_000;
 
 export const THRESHOLD = 0.4;
 export const MAX_CONDITIONS = 5;

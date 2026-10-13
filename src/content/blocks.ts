@@ -19,7 +19,26 @@ const isHtml = (node: Node | null | undefined): node is HTMLElement =>
   node?.nodeType === 1 && (node as Element).namespaceURI === XHTML;
 
 // Resolve styles in the element's own window; iframe content has its own viewport and media queries.
-export const computed = (el: Element) => (el.ownerDocument.defaultView ?? window).getComputedStyle(el);
+// During one extraction each element's style and visibility are worked out once: a block's own text
+// and the walk into its children ask about the same elements. Nothing is cached between extractions.
+let pass: { styles: Map<Element, CSSStyleDeclaration>; visible: Map<Element, boolean> } | undefined;
+export const computed = (el: Element) => {
+  let style = pass?.styles.get(el);
+  if (!style) {
+    style = (el.ownerDocument.defaultView ?? window).getComputedStyle(el);
+    pass?.styles.set(el, style);
+  }
+  return style;
+};
+function inPass<T>(read: () => T): T {
+  if (pass) return read();
+  pass = { styles: new Map(), visible: new Map() };
+  try {
+    return read();
+  } finally {
+    pass = undefined;
+  }
+}
 
 // Children in rendered order: an open shadow root replaces the light DOM, and slots pull in assigned nodes.
 function renderedChildren(el: HTMLElement): Node[] {
@@ -57,10 +76,11 @@ export function captureSelection(): Range[] {
 }
 
 export function extractBlocks(scope: SearchScope = "page", ranges: readonly Range[] = []): PageBlock[] {
-  const candidates =
+  const candidates = inPass(() =>
     scope === "selection"
       ? selectionBlocks(ranges)
-      : textBlocks(scope === "article" ? articleRoot() : document.body, scope === "article");
+      : textBlocks(scope === "article" ? articleRoot() : document.body, scope === "article"),
+  );
   return candidates
     .filter((c) => c.text.length >= (scope === "selection" || HEADING.test(c.el.tagName) ? 1 : MIN_BLOCK_CHARS))
     .flatMap((c) => splitAtBlockLimit(c.text).map((text) => ({ ...c, text })))
@@ -68,14 +88,18 @@ export function extractBlocks(scope: SearchScope = "page", ranges: readonly Rang
 }
 
 function visible(el: HTMLElement): boolean {
-  if (el.isContentEditable || el.closest(EXCLUDED)) return false;
+  const known = pass?.visible.get(el);
+  if (known !== undefined) return known;
   const style = computed(el);
-  return (
+  const result =
+    !el.isContentEditable &&
+    !el.closest(EXCLUDED) &&
     style.display !== "none" &&
     style.visibility !== "hidden" &&
     style.visibility !== "collapse" &&
-    (style.display === "contents" || el.checkVisibility())
-  );
+    (style.display === "contents" || el.checkVisibility());
+  pass?.visible.set(el, result);
+  return result;
 }
 
 export function articleRoot(): HTMLElement {
@@ -83,11 +107,14 @@ export function articleRoot(): HTMLElement {
     ...document.querySelectorAll<HTMLElement>(
       "article,main,[role='main'],#content,#article,.article-content,.post-content,.entry-content",
     ),
-  ].filter(visible);
+  ]
+    .filter(visible)
+    // innerText lays out the page; read it once per candidate, not on every comparison.
+    .map((el) => ({ el, length: el.innerText?.length ?? 0 }));
   // Prefer a focused article when it has useful content, otherwise choose the largest main region.
-  const articles = candidates.filter((el) => el.tagName === "ARTICLE" && (el.innerText?.length ?? 0) >= 80);
+  const articles = candidates.filter(({ el, length }) => el.tagName === "ARTICLE" && length >= 80);
   const pool = articles.length ? articles : candidates;
-  return pool.sort((a, b) => (b.innerText?.length ?? 0) - (a.innerText?.length ?? 0))[0] ?? document.body;
+  return pool.sort((a, b) => b.length - a.length)[0]?.el ?? document.body;
 }
 
 // One pass in rendered order. The latest heading seen so far labels every following block,

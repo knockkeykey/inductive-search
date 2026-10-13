@@ -38,7 +38,7 @@ await build({
     },
   }],
 });
-const { answer, createClient, defaultSettings, hasApiAccess, listModels, loadSettings, requestApiAccess, saveSettings } =
+const { answer, refine, retryFor, createClient, defaultSettings, hasApiAccess, listModels, loadSettings, requestApiAccess, saveSettings } =
   await import(pathToFileURL(outfile).href);
 const realFetch = globalThis.fetch;
 after(async () => {
@@ -202,4 +202,39 @@ test("closing a search cancels the provider request without emitting more progre
   const progress = [];
   await answer(search, { ...defaultSettings("openrouter"), apiKey: "router-test-key" }, controller.signal, (p) => progress.push(p));
   assert.deepEqual(progress, []);
+});
+
+test("large batches are not retried after a timeout; small ones are", () => {
+  assert.deepEqual(retryFor([{ id: "B001", text: "x".repeat(20_000) }]), { apiTimeoutError: false });
+  assert.deepEqual(retryFor([{ id: "B001", text: "short paragraph" }]), { apiTimeoutError: true });
+});
+
+test("refine scores each paragraph in its own request, never showing it the other paragraphs", async () => {
+  const pages = [];
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    pages.push(body.state.page_text);
+    const text = body.state.page_text;
+    // The B004 paragraph comes back invalid: only that paragraph loses its sentence scores.
+    const answers = text.includes("Three.")
+      ? { S001: { type: "noul", noul: 2 } }
+      : { S001: { type: "noul", noul: 0.2 }, S002: { type: "noul", noul: 0.9 } };
+    assert.deepEqual(Object.keys(body.questions), Object.keys(answers));
+    return json({ answers, model: "jev-1.13", usage: { input_tokens: 100, output_tokens: 1 } });
+  };
+  const result = await refine(
+    {
+      type: "refine",
+      url: search.url,
+      title: search.title,
+      query: search.query,
+      paragraphs: [
+        { id: "B001", sentences: [{ id: "S001", text: "One." }, { id: "S002", text: "Two." }] },
+        { id: "B004", sentences: [{ id: "S001", text: "Three." }] },
+      ],
+    },
+    { ...defaultSettings(), apiKey: "official-test-key" },
+  );
+  assert.deepEqual(pages.sort(), ["S001| One.\nS002| Two.", "S001| Three."]);
+  assert.deepEqual(result, { scores: { B001: { S001: 0.2, S002: 0.9 } } });
 });

@@ -27,10 +27,13 @@ export class ScopeFrame {
     window.addEventListener("resize", schedule);
   }
 
-  show(scope: SearchScope, ranges: readonly Range[]) {
+  // Finding the article container reads the page's layout, so it is reused until `refresh`,
+  // a different scope, or the container leaving the page.
+  show(scope: SearchScope, ranges: readonly Range[], refresh = false) {
+    const keep = !refresh && scope === this.scope && this.target?.isConnected;
     this.scope = scope;
     this.ranges = ranges;
-    this.target = scope === "article" ? articleRoot() : undefined;
+    if (!keep) this.target = scope === "article" ? articleRoot() : undefined;
     this.label.textContent = `搜索范围 · ${LABELS[scope]}`;
     this.root.className = `hunch-scope hunch-scope-${scope}`;
     const highlights = globalThis.CSS?.highlights;

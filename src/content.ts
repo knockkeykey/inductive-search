@@ -124,6 +124,7 @@ class Hunch {
   private failed: BlockId[] = [];
   private lastProgress: Progress | undefined;
   private growthTimer: number | undefined;
+  private warmedAt = 0;
   private readonly observer = new MutationObserver((records) => {
     if (records.some((record) => !this.host.contains(record.target))) this.scheduleGrowthCheck();
   });
@@ -190,7 +191,18 @@ class Hunch {
     this.host.classList.add("hunch-open");
     this.rescope();
     this.observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    this.warm();
     this.bar.focus();
+  }
+  // Wakes the background worker and lets it open the provider connection ahead of submit.
+  // Throttled here so typing doesn't send a message per key; the worker throttles the network side.
+  private warm() {
+    if (Date.now() - this.warmedAt < KEEPALIVE_MS) return;
+    this.warmedAt = Date.now();
+    // Best effort: a reloaded extension throws synchronously here, and opening must not fail.
+    try {
+      void Promise.resolve(browser.runtime.sendMessage({ type: "warm" })).catch(() => {});
+    } catch {}
   }
   close() {
     this.host.classList.remove("hunch-open");
@@ -241,9 +253,10 @@ class Hunch {
     this.host.dataset.theme =
       this.prefs.theme === "auto" ? (pageTheme() === "light" ? "dark" : "light") : this.prefs.theme;
   }
-  // Outlines the search range for as long as the bottom bar is up.
-  private paintScope() {
-    if (this.isOpen && this.prefs.showScope) this.scopeFrame.show(this.bar.controls().scope, this.ranges);
+  // Outlines the search range for as long as the bottom bar is up. The article container is looked up
+  // again only when `refresh` is set (scope switch, page change); typing just reuses it.
+  private paintScope(refresh = false) {
+    if (this.isOpen && this.prefs.showScope) this.scopeFrame.show(this.bar.controls().scope, this.ranges, refresh);
     else this.scopeFrame.hide();
   }
   private reset() {
@@ -276,13 +289,15 @@ class Hunch {
     this.request = undefined;
     this.reset();
     this.paintScope();
+    this.warm();
   }
+  // Reading the page waits for submit: search() extracts the blocks it sends, so reading here would be thrown away.
   private rescope() {
     this.abort();
     this.request = undefined;
-    this.blocks = extractBlocks(this.bar.controls().scope, this.ranges);
+    this.blocks = [];
     this.reset();
-    this.paintScope();
+    this.paintScope(true);
   }
   private search() {
     if (!this.isOpen) return;
@@ -393,7 +408,8 @@ class Hunch {
     const scope = this.bar.controls().scope;
     if (scope === "selection") return;
     if (!req) {
-      this.blocks = extractBlocks(scope, this.ranges);
+      // Nothing to compare against before the first search; only the article outline may have moved.
+      if (scope === "article") this.paintScope(true);
       return;
     }
     if (this.searching || req.scope !== scope) return;
@@ -441,7 +457,8 @@ class Hunch {
     if (this.lastProgress) this.bar.set(this.status(this.lastProgress));
     else this.bar.set({ counter: this.counterText() });
   }
-  // Scores sentences inside the top hits once their paragraph scores are final, then marks the best ones.
+  // Scores sentences inside the top hits as soon as their paragraph scores arrive (after each batch),
+  // all new hits in one request, then marks the best ones.
   // Cached per block, so threshold changes only repaint; a hit new to the top 3 is scored then.
   private refineTop() {
     const req = this.request;
@@ -450,6 +467,7 @@ class Hunch {
     }
     const top = this.hits.filter((hit) => !HEADING.test(hit.el.tagName) && hit.p >= this.prefs.threshold);
     const generation = this.generation;
+    const batch: { key: string; hit: Hit; sentences: Sentence[] }[] = [];
     for (const hit of top.slice(0, REFINE_TOP)) {
       const key = `${hit.id}\u0000${hit.text}`;
       if (this.refined.has(key) || !(hit.id in this.scores)) continue;
@@ -458,19 +476,26 @@ class Hunch {
       const sentences = refinableSentences(hit.text);
       if (!sentences.length) continue;
       this.refined.set(key, "pending");
+      batch.push({ key, hit, sentences });
+    }
+    if (batch.length) {
       const message: Refine = {
         type: "refine",
         url: req.url,
         title: req.title,
         query: req.query,
-        text: hit.text,
-        sentences: sentences.map(({ id, text }) => ({ id, text })),
+        paragraphs: batch.map(({ hit, sentences }) => ({
+          id: hit.id,
+          sentences: sentences.map(({ id, text }) => ({ id, text })),
+        })),
       };
       Promise.resolve(browser.runtime.sendMessage(message) as Promise<RefineResult | undefined>)
         .catch(() => undefined)
         .then((result) => {
           if (generation !== this.generation) return;
-          this.refined.set(key, { sentences, scores: result?.scores ?? {} });
+          for (const { key, hit, sentences } of batch) {
+            this.refined.set(key, { sentences, scores: result?.scores?.[hit.id] ?? {} });
+          }
           this.paintRefined();
         });
     }

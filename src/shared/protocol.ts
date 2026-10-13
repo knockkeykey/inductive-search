@@ -51,16 +51,17 @@ export type TabMessage = Toggle | Ping;
 
 export const SEARCH_PORT = "hunch-search";
 
-// Second pass inside one hit: each sentence of the block gets its own score.
+// Second pass inside the top hits: each sentence of each paragraph gets its own score.
+// Paragraphs are scored separately; the message only saves round trips to the background.
 export interface Refine {
   type: "refine";
   url: string;
   title: string;
   query: string;
-  text: string;
-  sentences: { id: `S${string}`; text: string }[];
+  paragraphs: { id: BlockId; sentences: { id: `S${string}`; text: string }[] }[];
 }
-// Empty when the request failed; the paragraph highlight stays as it is.
+// Sentence scores per paragraph. A paragraph is missing when its answers were invalid
+// or the request failed; its paragraph highlight stays as it is.
 export interface RefineResult {
-  scores: Record<`S${string}`, number>;
+  scores: Partial<Record<BlockId, Record<`S${string}`, number>>>;
 }

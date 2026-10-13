@@ -39,8 +39,9 @@ await build({
             storage: { local: { get: async () => {
               state.events.push("storage");
               return { settings: { provider: "openlux", profiles: { openlux: { apiKey: "dummy-key", model: "jev-1.13.0" } } } };
-            } } },
+            } }, onChanged: event("storage-change") },
             permissions: {
+              onAdded: event("permission-added"), onRemoved: event("permission-removed"),
               contains: async () => state.apiAccess ?? true,
               request: async () => {
                 state.events.push("permission-request");

@@ -13,6 +13,7 @@ import {
   combineConditions,
   conditionId,
   conditionQuestions,
+  LARGE_CHUNK_CHARS,
   MAX_CHUNK_BLOCKS,
   MAX_CHUNK_CHARS,
   MAX_CONCURRENT_REQUESTS,
@@ -77,7 +78,7 @@ export async function answer(
                 blocks.map((b) => b.id),
               ),
         },
-        { signal },
+        { signal, retry: retryFor(blocks) },
       );
       const chunkScores: Record<BlockId, number> = {};
       const chunkConditions: Record<BlockId, number[]> = {};
@@ -116,38 +117,50 @@ export async function answer(
   }
 }
 
-// Scores each sentence of one hit. The whole paragraph is the page text, so a sentence is
-// judged with its neighbours as context. Any failure returns no scores: the paragraph result stands.
+// Scores each sentence of the top hits. One message carries them all, but every paragraph is still
+// its own request: the paragraph alone is the page text, so a sentence is judged only with its own
+// neighbours as context. A failed or invalid paragraph gets no scores: its paragraph result stands.
 export async function refine(req: Refine, settings: Settings, signal?: AbortSignal): Promise<RefineResult> {
-  if (!req.sentences.length) return { scores: {} };
-  try {
-    const client = createClient(settings);
-    const result = await client.systemOne(
-      {
-        state: {
-          url: req.url,
-          title: req.title,
-          page_text: req.sentences.map((s) => `${s.id}| ${s.text}`).join("\n"),
-        },
-        questions: sentenceQuestionsFor(
-          req.query,
-          req.sentences.map((s) => s.id),
-        ),
-      },
-      signal ? { signal } : undefined,
-    );
-    const scores: RefineResult["scores"] = {};
-    for (const { id } of req.sentences) {
-      const a = (result.answers as Record<string, NoulResponse> | undefined)?.[id];
-      if (a?.type !== "noul" || typeof a.noul !== "number" || !Number.isFinite(a.noul) || a.noul < 0 || a.noul > 1)
-        return { scores: {} };
-      scores[id] = a.noul;
-    }
-    return { scores };
-  } catch {
-    return { scores: {} };
-  }
+  const paragraphs = req.paragraphs.filter((p) => p.sentences.length);
+  if (!paragraphs.length) return { scores: {} };
+  const client = createClient(settings);
+  const scores: RefineResult["scores"] = {};
+  await Promise.all(
+    paragraphs.map(async (p) => {
+      try {
+        const result = await client.systemOne(
+          {
+            state: {
+              url: req.url,
+              title: req.title,
+              page_text: p.sentences.map((s) => `${s.id}| ${s.text}`).join("\n"),
+            },
+            questions: sentenceQuestionsFor(
+              req.query,
+              p.sentences.map((s) => s.id),
+            ),
+          },
+          signal ? { signal } : undefined,
+        );
+        const values: Record<`S${string}`, number> = {};
+        for (const { id } of p.sentences) {
+          const a = (result.answers as Record<string, NoulResponse> | undefined)?.[id];
+          if (a?.type !== "noul" || typeof a.noul !== "number" || !Number.isFinite(a.noul) || a.noul < 0 || a.noul > 1)
+            return;
+          values[id] = a.noul;
+        }
+        scores[p.id] = values;
+      } catch {}
+    }),
+  );
+  return { scores };
 }
+
+// A large batch that timed out will most likely time out again, and each attempt costs the full
+// timeout. Fail it at once instead: its blocks are offered on the 重试 button.
+export const retryFor = (blocks: readonly Block[]): { apiTimeoutError: boolean } => ({
+  apiTimeoutError: blocks.reduce((chars, b) => chars + b.text.length, 0) < LARGE_CHUNK_CHARS,
+});
 
 async function parallel<T>(items: T[], limit: number, signal: AbortSignal, work: (item: T) => Promise<void>) {
   let index = 0;
