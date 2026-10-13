@@ -30,7 +30,9 @@ export interface BarHandlers {
   onTheme(theme: Theme): void;
   onThreshold(value: number): void;
   onRefine(on: boolean): void;
+  onSpotlight(on: boolean): void;
   onSentenceThreshold(value: number): void;
+  onResetSettings(): void;
   onRetry(): void;
 }
 export interface Status {
@@ -229,6 +231,9 @@ export class FindBar {
   setRefine(on: boolean) {
     this.settings.setRefine(on);
   }
+  setSpotlight(on: boolean) {
+    this.settings.setSpotlight(on);
+  }
   setSentenceThreshold(value: number) {
     this.settings.setSentenceThreshold(value);
   }
@@ -310,6 +315,7 @@ class SettingsPanel {
   });
   private readonly thresholdValue = element("output", { class: "hunch-range-value" });
   private readonly refine = element("input", { type: "checkbox", role: "switch", class: "hunch-switch" });
+  private readonly spotlight = element("input", { type: "checkbox", role: "switch", class: "hunch-switch" });
   private readonly sentence = element("input", {
     type: "range",
     class: "hunch-range",
@@ -331,11 +337,69 @@ class SettingsPanel {
   );
   private readonly helpButton = iconButton("question", "判断标准说明", "hunch-help-toggle");
   private readonly help: HTMLElement;
+  private readonly resetButton = iconButton("reset", "恢复默认设置", "hunch-reset-toggle");
+  private readonly confirmCancel = element("button", { type: "button" }, "取消");
+  private readonly confirmOk = element("button", { type: "button", class: "hunch-danger" }, "恢复");
+  private readonly confirm: HTMLElement;
+  // Per-setting explanations, each toggled by the ? next to its label.
+  private readonly notes: { button: HTMLButtonElement; note: HTMLElement }[] = [];
   readonly root: HTMLElement;
   private inside = false;
 
   constructor() {
     const id = `hunch-settings-${++uid}`;
+    const explain = (name: string, about: string, lower: string, higher: string, child = false) => {
+      const note = element(
+        "div",
+        { class: `hunch-note${child ? " hunch-note-child" : ""}`, id: `${id}-${name}-note`, hidden: "" },
+        element("p", {}, about),
+        element(
+          "ul",
+          {},
+          element("li", {}, element("b", {}, "调低："), lower),
+          element("li", {}, element("b", {}, "调高："), higher),
+        ),
+      );
+      const button = iconButton("question", "这是什么？", "hunch-note-toggle");
+      button.setAttribute("aria-expanded", "false");
+      button.setAttribute("aria-controls", note.id);
+      this.notes.push({ button, note });
+      return { button, note };
+    };
+    const paragraphHelp = explain(
+      "paragraph",
+      "每个段落都会得到一个 0 到 1 的相关度分数，表示它有多像你要找的内容。只有分数达到这个值的段落才会被标出。",
+      "结果更多，不容易漏掉，但会混进不太相关的段落。",
+      "结果更少更准，但可能漏掉说法不同的相关段落。",
+    );
+    const sentenceHelp = explain(
+      "sentence",
+      "开启段内精确定位后，排名前 3 的段落会再逐句打分。分数达到这个值的句子会在段落中加深标出，帮你直接看到关键句。",
+      "加深标出的句子更容易出现，但未必最贴切。",
+      "只标出把握很大的句子，有时一句都不标。",
+      true,
+    );
+    this.confirm = element(
+      "div",
+      { class: "hunch-confirm", hidden: "" },
+      element(
+        "div",
+        {
+          class: "hunch-confirm-card",
+          role: "alertdialog",
+          "aria-modal": "true",
+          "aria-labelledby": `${id}-confirm-title`,
+          "aria-describedby": `${id}-confirm-body`,
+        },
+        element("div", { class: "hunch-confirm-title", id: `${id}-confirm-title` }, "恢复默认设置？"),
+        element(
+          "div",
+          { class: "hunch-confirm-body", id: `${id}-confirm-body` },
+          "段落阈值、段内精确定位、句子阈值、聚光灯和外观都会恢复为默认值。",
+        ),
+        element("div", { class: "hunch-confirm-actions" }, this.confirmCancel, this.confirmOk),
+      ),
+    );
     this.help = element(
       "div",
       { class: "hunch-help", id: `${id}-help`, hidden: "" },
@@ -365,13 +429,14 @@ class SettingsPanel {
         element("span", { class: "hunch-setting-label" }, label),
         ...controls,
       );
+    // A <div>, not <label>: the ? button is labelable and would steal the label's clicks from the slider.
     this.sentenceRow = element(
-      "label",
+      "div",
       { class: "hunch-setting hunch-setting-child" },
       element(
         "span",
         { class: "hunch-setting-label" },
-        "句子阈值",
+        element("span", { class: "hunch-setting-name" }, "句子阈值", sentenceHelp.button),
         element("span", { class: "hunch-setting-hint" }, "开启段内精确定位后可调"),
       ),
       this.sentence,
@@ -391,16 +456,36 @@ class SettingsPanel {
         { class: "hunch-settings-head" },
         element("span", { class: "hunch-settings-title" }, "设置"),
         this.helpButton,
+        this.resetButton,
       ),
       this.help,
-      row("段落阈值", this.threshold, this.thresholdValue),
-      element("div", { class: "hunch-setting-group" }, row("段内精确定位", this.refine), this.sentenceRow),
+      element(
+        "div",
+        { class: "hunch-setting" },
+        element(
+          "span",
+          { class: "hunch-setting-label" },
+          element("span", { class: "hunch-setting-name" }, "段落阈值", paragraphHelp.button),
+        ),
+        this.threshold,
+        this.thresholdValue,
+      ),
+      paragraphHelp.note,
+      element(
+        "div",
+        { class: "hunch-setting-group" },
+        row("段内精确定位", this.refine),
+        this.sentenceRow,
+        sentenceHelp.note,
+      ),
+      row("聚光灯", this.spotlight),
       element(
         "div",
         { class: "hunch-setting" },
         element("span", { class: "hunch-setting-label" }, "外观"),
         element("div", { class: "hunch-segmented", role: "radiogroup", "aria-label": "外观" }, ...this.themeButtons),
       ),
+      this.confirm,
     );
     this.button.setAttribute("aria-controls", id);
   }
@@ -412,11 +497,39 @@ class SettingsPanel {
       this.help.hidden = !open;
       this.helpButton.setAttribute("aria-expanded", String(open));
     });
+    for (const { button, note } of this.notes) {
+      button.addEventListener("click", () => {
+        const open = note.hidden;
+        note.hidden = !open;
+        button.setAttribute("aria-expanded", String(open));
+      });
+    }
+    this.resetButton.addEventListener("click", () => this.ask(true));
+    this.confirmCancel.addEventListener("click", () => this.ask(false));
+    this.confirmOk.addEventListener("click", () => {
+      this.ask(false);
+      handlers.onResetSettings();
+    });
+    // Only the two buttons are focusable while confirming; Tab cycles between them.
+    this.confirm.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !event.isComposing) {
+        event.stopPropagation();
+        this.ask(false);
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        // event.target, not document.activeElement: focus inside the closed shadow root reports the host.
+        (event.target === this.confirmOk ? this.confirmCancel : this.confirmOk).focus();
+      }
+    });
+    this.confirm.addEventListener("pointerdown", (event) => {
+      if (event.target === this.confirm) this.ask(false);
+    });
     this.threshold.addEventListener("input", () => {
       this.paintThresholdValue();
       handlers.onThreshold(Number(this.threshold.value));
     });
     this.refine.addEventListener("change", () => handlers.onRefine(this.refine.checked));
+    this.spotlight.addEventListener("change", () => handlers.onSpotlight(this.spotlight.checked));
     this.sentence.addEventListener("input", () => {
       this.paintSentenceValue();
       handlers.onSentenceThreshold(Number(this.sentence.value));
@@ -450,7 +563,14 @@ class SettingsPanel {
     });
   }
 
+  // Opens or dismisses the reset confirmation; Cancel takes focus so Enter can't reset by accident.
+  private ask(open: boolean) {
+    this.confirm.hidden = !open;
+    if (open) this.confirmCancel.focus();
+    else this.resetButton.focus();
+  }
   private toggle(open: boolean, refocus = true) {
+    this.confirm.hidden = true;
     this.root.hidden = !open;
     this.button.setAttribute("aria-expanded", String(open));
     this.button.setAttribute("aria-pressed", String(open));
@@ -466,6 +586,9 @@ class SettingsPanel {
   setThreshold(value: number) {
     this.threshold.value = String(value);
     this.paintThresholdValue();
+  }
+  setSpotlight(on: boolean) {
+    this.spotlight.checked = on;
   }
   setRefine(on: boolean) {
     this.refine.checked = on;

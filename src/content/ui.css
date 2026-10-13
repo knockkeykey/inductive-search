@@ -605,6 +605,75 @@ textarea::placeholder {
   filter: blur(6px);
   opacity: 0.3;
 }
+/* Spotlight: dims the page around the current hit. The cutout's huge spread shadow is the dimming;
+   a hairline and a soft halo lift the lit paragraph off it, like a focused macOS window. */
+.hunch-spotlight {
+  --hunch-spotlight-dim: rgba(0, 0, 0, 0.32);
+  --hunch-spotlight-halo: rgba(255, 255, 255, 0.5);
+  position: fixed;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 0.5px var(--hunch-spotlight-halo),
+    0 0 24px 4px rgba(0, 0, 0, 0.18),
+    0 0 0 200vmax var(--hunch-spotlight-dim);
+  transition: opacity 0.3s var(--hunch-ease);
+}
+@starting-style {
+  .hunch-spotlight {
+    opacity: 0;
+  }
+}
+.hunch-spotlight-dark {
+  --hunch-spotlight-dim: rgba(0, 0, 0, 0.55);
+  --hunch-spotlight-halo: rgba(255, 255, 255, 0.18);
+}
+/* Matches the page badge in content.css: centered on a line 4px above the paragraph, 4px in from
+   its right edge. The cutout is padded 8px, hence 4px and 12px here. */
+.hunch-spotlight-score {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  translate: 0 -50%;
+  font:
+    600 10.5px / 1 -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: rgba(0, 0, 0, 0.78);
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  backdrop-filter: blur(12px) saturate(1.8);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+  padding: 4px 7px;
+  border-radius: 999px;
+}
+.hunch-spotlight-dark .hunch-spotlight-score {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(44, 44, 46, 0.92);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+}
+/* Safari find-style bounce on each new paragraph; only transforms, so it stays on the compositor. */
+.hunch-spotlight-pop {
+  animation: hunch-spotlight-pop 0.42s var(--hunch-ease);
+}
+@keyframes hunch-spotlight-pop {
+  0% {
+    scale: 1.06;
+  }
+  45% {
+    scale: 0.985;
+  }
+  100% {
+    scale: 1;
+  }
+}
 @keyframes hunch-scope-spin {
   to {
     --hunch-scope-angle: 360deg;
@@ -741,6 +810,7 @@ textarea::placeholder {
   fill: none;
 }
 .hunch-settings {
+  position: relative;
   order: -1;
   pointer-events: auto;
   align-self: flex-end;
@@ -764,8 +834,97 @@ textarea::placeholder {
   font-size: 13px;
   font-weight: 600;
 }
-.hunch-help-toggle[aria-expanded="true"] {
+.hunch-help-toggle[aria-expanded="true"],
+.hunch-note-toggle[aria-expanded="true"] {
   color: var(--hunch-accent-text);
+}
+.hunch-reset-toggle {
+  margin-left: auto;
+}
+.hunch-setting-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hunch-note-toggle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.hunch-note-toggle .hunch-icon {
+  width: 14px;
+  height: 14px;
+}
+.hunch-note {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--hunch-fill);
+  color: var(--hunch-secondary-label);
+  font-size: 12px;
+  line-height: 1.55;
+  user-select: text;
+}
+.hunch-note-child {
+  margin-left: 24px;
+}
+.hunch-note p {
+  margin: 0 0 4px;
+}
+.hunch-note ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.hunch-note b {
+  font-weight: 600;
+  color: var(--hunch-label);
+}
+/* Reset confirmation: covers the panel so nothing behind it can be changed mid-question. */
+.hunch-confirm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: inherit;
+  background: light-dark(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.4));
+  animation: hunch-fade 0.15s;
+}
+.hunch-confirm-card {
+  width: 100%;
+  max-width: 260px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--hunch-material-solid);
+  box-shadow: var(--hunch-shadow);
+  text-align: center;
+  animation: hunch-rise 0.2s var(--hunch-ease);
+}
+.hunch-confirm-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.hunch-confirm-body {
+  margin: 4px 0 12px;
+  color: var(--hunch-secondary-label);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.hunch-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+.hunch-confirm-actions button {
+  flex: 1;
+}
+.hunch-danger {
+  background: var(--hunch-red);
+  color: #fff;
+}
+.hunch-danger:hover {
+  background: var(--hunch-red);
+  opacity: 0.88;
 }
 .hunch-help {
   margin: 0 0 6px;
@@ -890,6 +1049,11 @@ textarea::placeholder {
   box-shadow: 0 0 0 3px var(--hunch-focus);
 }
 
+@keyframes hunch-fade {
+  from {
+    opacity: 0;
+  }
+}
 @keyframes hunch-rise {
   from {
     opacity: 0;

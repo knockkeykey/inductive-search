@@ -5,13 +5,13 @@
   initial-value: 0deg;
 }
 
-/* Page-scope highlights, after Notes' highlighter and Safari's find-in-page. Paragraphs get only a
-   faint warm wash; the marked sentences inside them (a saturated highlighter stroke) carry the
-   emphasis. .hunch-dark (set per element by tone.ts) switches to the dark palette. */
+/* Page-scope highlights, after Notes' highlighter and Safari's find-in-page. Paragraphs get a warm
+   wash, no border, so only the current one is ringed; the marked sentences inside them (a
+   saturated highlighter stroke) carry the emphasis. .hunch-dark (set per element by tone.ts) switches to the dark palette. */
 .hunch-hl {
   --hunch-tint: 255, 204, 0;
-  --hunch-wash: rgba(var(--hunch-tint), var(--hunch-alpha, 0.08));
-  --hunch-ring: rgba(214, 150, 0, 0.75);
+  --hunch-wash: rgba(var(--hunch-tint), var(--hunch-alpha, 0.18));
+  --hunch-ring: rgba(214, 150, 0, 0.85);
   --hunch-lift: rgba(0, 0, 0, 0.1);
   --hunch-badge-bg: rgba(255, 255, 255, 0.78);
   --hunch-badge-fg: rgba(0, 0, 0, 0.78);
@@ -26,8 +26,8 @@
 }
 .hunch-hl.hunch-dark {
   --hunch-tint: 255, 214, 10;
-  --hunch-wash: rgba(var(--hunch-tint), calc(var(--hunch-alpha, 0.08) * 1.6));
-  --hunch-ring: rgba(255, 214, 10, 0.7);
+  --hunch-wash: rgba(var(--hunch-tint), calc(var(--hunch-alpha, 0.18) * 1.2));
+  --hunch-ring: rgba(255, 214, 10, 0.8);
   --hunch-lift: rgba(0, 0, 0, 0.45);
   --hunch-badge-bg: rgba(44, 44, 46, 0.8);
   --hunch-badge-fg: rgba(255, 255, 255, 0.9);
@@ -73,7 +73,7 @@
    the outline offset and shadows, so the page element's layout is never touched. */
 .hunch-hl.hunch-current {
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own outline */
-  outline: 1px solid var(--hunch-ring) !important;
+  outline: 1.5px solid var(--hunch-ring) !important;
   outline-offset: 4px;
   box-shadow:
     0 0 0 4px var(--hunch-wash),
@@ -93,6 +93,17 @@
       0 0 0 3px var(--hunch-wash),
       0 5px 18px 3px var(--hunch-lift);
   }
+}
+/* Under the spotlight the cutout frames the paragraph; a ring and lift on top would double it. */
+.hunch-hl.hunch-current.hunch-spot {
+  /* biome-ignore lint/complexity/noImportantStyles: matches the !important outline above */
+  outline: none !important;
+  box-shadow: 0 0 0 4px var(--hunch-wash);
+  animation: none;
+}
+/* The spotlight draws its own badge above the dimming, which would otherwise cut this one in half. */
+.hunch-hl.hunch-rel.hunch-spot::after {
+  visibility: hidden;
 }
 @media (prefers-reduced-motion: reduce) {
   .hunch-hl,

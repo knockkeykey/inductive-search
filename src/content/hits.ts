@@ -48,17 +48,17 @@ export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
 
     if (computed(el).position === "static") el.classList.add("hunch-rel");
 
-    // Keyword-only hits sit below the threshold; give them the faintest wash. Kept light so the
-    // marked sentences inside carry the emphasis.
+    // Keyword-only hits sit below the threshold; give them the lightest wash. Still well below the
+    // sentence marks' saturation so those carry the emphasis.
     const strength = Math.max(0, (p - threshold) / (1 - threshold));
-    el.style.setProperty("--hunch-alpha", (0.05 + 0.05 * strength).toFixed(3));
+    el.style.setProperty("--hunch-alpha", (0.14 + 0.12 * strength).toFixed(3));
     el.dataset.hunchP = p.toFixed(2);
   }
 }
 
 export function clearPaint() {
   for (const el of [...painted, ...document.querySelectorAll<HTMLElement>(".hunch-hl")]) {
-    el.classList.remove("hunch-hl", "hunch-rel", "hunch-current", "hunch-hover");
+    el.classList.remove("hunch-hl", "hunch-rel", "hunch-current", "hunch-hover", "hunch-spot");
     clearTone(el);
     el.style.removeProperty("--hunch-alpha");
     delete el.dataset.hunchP;

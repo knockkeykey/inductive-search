@@ -7,6 +7,7 @@ import { clearPaint, type Hit, markCurrent, paint, rankHits } from "./content/hi
 import { ScrollMarks } from "./content/marks";
 import { ScopeFrame } from "./content/scope-frame";
 import { clearSentences, paintSentences, sentenceRanges } from "./content/sentence-marks";
+import { Spotlight } from "./content/spotlight";
 import {
   type BlockId,
   blockId,
@@ -48,7 +49,17 @@ interface UiPrefs {
   // Second pass that scores sentences inside the top hits.
   refine: boolean;
   sentenceThreshold: number;
+  // Dims the page around the current hit.
+  spotlight: boolean;
 }
+const DEFAULT_PREFS: UiPrefs = {
+  theme: "auto",
+  showScope: true,
+  threshold: validThreshold(undefined),
+  refine: true,
+  sentenceThreshold: SENTENCE_THRESHOLD,
+  spotlight: true,
+};
 // Sentence scores for one hit; `scores` stays empty when the request failed.
 interface Refined {
   sentences: Sentence[];
@@ -70,16 +81,18 @@ class Hunch {
     onScopeVisible: () => this.setPrefs({ showScope: !this.prefs.showScope }),
     onTheme: (theme) => this.setPrefs({ theme }),
     onRefine: (refine) => this.setPrefs({ refine }),
+    onSpotlight: (spotlight) => this.setPrefs({ spotlight }),
     onSentenceThreshold: (sentenceThreshold) => this.setPrefs({ sentenceThreshold }),
+    // Everything adjustable in the settings panel; the scope outline toggle lives on the toolbar.
+    onResetSettings: () => {
+      const { showScope: _, ...defaults } = DEFAULT_PREFS;
+      this.setPrefs(defaults);
+      this.bar.flash("已恢复默认设置。");
+    },
   });
   private readonly scopeFrame = new ScopeFrame();
-  private prefs: UiPrefs = {
-    theme: "auto",
-    showScope: true,
-    threshold: validThreshold(undefined),
-    refine: true,
-    sentenceThreshold: SENTENCE_THRESHOLD,
-  };
+  private readonly spotlight = new Spotlight();
+  private prefs: UiPrefs = { ...DEFAULT_PREFS };
   // Keyed by block id and text, since one element can hold several split blocks.
   private refined = new Map<string, Refined | "pending">();
   // Bumped whenever results are invalidated, so late sentence scores from an old search are dropped.
@@ -134,7 +147,14 @@ class Hunch {
     this.bar.root.prepend(dock.grabber);
     // After the bar in the DOM (and in tab order); CSS order places it above.
     dock.root.append(this.bar.panel);
-    this.shadow.append(style, this.scopeFrame.root, this.copyButton.root, dock.root, this.marks.root);
+    this.shadow.append(
+      style,
+      this.spotlight.root,
+      this.scopeFrame.root,
+      this.copyButton.root,
+      dock.root,
+      this.marks.root,
+    );
     document.documentElement.appendChild(this.host);
     this.ready = Promise.all([styled, this.loadPrefs()]).then(() => {
       this.host.style.removeProperty("display");
@@ -190,6 +210,7 @@ class Hunch {
         threshold: validThreshold(ui?.threshold),
         refine: ui?.refine !== false,
         sentenceThreshold: validSentenceThreshold(ui?.sentenceThreshold),
+        spotlight: ui?.spotlight !== false,
       });
     } catch {
       this.applyPrefs(this.prefs);
@@ -209,6 +230,8 @@ class Hunch {
     this.bar.setThreshold(prefs.threshold);
     this.bar.setRefine(prefs.refine);
     this.bar.setSentenceThreshold(prefs.sentenceThreshold);
+    this.bar.setSpotlight(prefs.spotlight);
+    this.paintSpotlight();
     if (changed && this.request) this.rerank();
     else if (resentence) this.refineTop();
     this.paintScope();
@@ -230,6 +253,7 @@ class Hunch {
     this.generation++;
     this.hits = [];
     this.current = undefined;
+    this.spotlight.hide();
     this.scores = {};
     this.conditionScores = {};
     this.base = { scores: {}, conditionScores: {} };
@@ -413,6 +437,7 @@ class Hunch {
     if (!this.current && !this.searching && this.lastProgress && this.hits[0]) this.goTo(this.hits[0]);
     this.marks.draw(this.hits, this.current);
     this.copyButton.update(this.hits, this.current);
+    this.paintSpotlight();
     if (this.lastProgress) this.bar.set(this.status(this.lastProgress));
     else this.bar.set({ counter: this.counterText() });
   }
@@ -518,6 +543,10 @@ class Hunch {
     this.bar.set({ counter: this.counterText() });
     this.marks.draw(this.hits, this.current);
     this.copyButton.update(this.hits, this.current);
+    this.paintSpotlight();
+  }
+  private paintSpotlight() {
+    this.spotlight.show(this.isOpen && this.prefs.spotlight ? this.current?.el : undefined);
   }
 }
 

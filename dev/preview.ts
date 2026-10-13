@@ -33,6 +33,7 @@ const bar = new FindBar({
   onThreshold: noop,
   onRefine: (on) => bar.setRefine(on),
   onSentenceThreshold: noop,
+  onResetSettings: noop,
   onTheme: (theme) => {
     if (theme === "auto") delete host.dataset.theme;
     else host.dataset.theme = theme;
