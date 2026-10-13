@@ -1,4 +1,5 @@
 import type { Combination, SearchMode, SearchScope } from "../shared/protocol";
+import { THRESHOLDS } from "../shared/ranking";
 import { ConditionList } from "./condition-list";
 import { element } from "./element";
 import { icon } from "./icons";
@@ -20,11 +21,14 @@ export interface SearchControls {
 export interface BarHandlers {
   onSubmit(): void;
   onChange(): void;
+  onScope(): void;
+  onRefresh(): void;
   onStep(dir: 1 | -1): void;
   onClose(): void;
-  onSaved(): void;
   onScopeVisible(): void;
   onTheme(): void;
+  onThreshold(value: number): void;
+  onRetry(): void;
 }
 export interface Status {
   counter?: string;
@@ -68,15 +72,11 @@ export class FindBar {
   private readonly leading = element("span", { class: "hunch-field-icon" }, icon("magnifier"));
   private readonly counter = element("span", { class: "hunch-counter" });
   private readonly stepper: HTMLElement;
+  // Status and errors get their own full-width row so long messages wrap instead of being cut off.
   private readonly verdict = element("span", { class: "hunch-verdict", role: "status", "aria-live": "polite" });
   private readonly meta = element("span", { class: "hunch-meta" });
+  private readonly status = element("div", { class: "hunch-status" }, this.verdict, this.meta);
   private readonly progress = element("div", { class: "hunch-progress-fill" });
-  private readonly savedButton = element(
-    "button",
-    { type: "button", class: "hunch-chip", "aria-pressed": "false", title: "已存摘录" },
-    icon("bookmark"),
-    element("span", { class: "hunch-chip-count" }, "0"),
-  );
   private readonly scopeButton = element(
     "button",
     {
@@ -89,6 +89,26 @@ export class FindBar {
     icon("viewfinder"),
   );
   private readonly themeButton = element("button", { type: "button", class: "hunch-chip hunch-theme-toggle" });
+  // Shown when the page grew after a search (infinite scroll, lazy sections).
+  private readonly refreshButton = element(
+    "button",
+    { type: "button", class: "hunch-chip hunch-refresh", title: "只搜索页面新增的文字块", hidden: "" },
+    icon("refresh"),
+    element("span", { class: "hunch-chip-count" }, ""),
+  );
+  // Re-ranks the scores already received; changing it never sends a request.
+  private readonly threshold = element("select", {
+    class: "hunch-chip-select",
+    "aria-label": "相关度阈值",
+    title: "相关度阈值：越低结果越多、越可能不相关。只重新排序，不重新请求。",
+  });
+  // Shown when some batches failed; re-sends only the blocks that got no score.
+  private readonly retryButton = element(
+    "button",
+    { type: "button", class: "hunch-chip hunch-retry", title: "只重新搜索失败的文字块", hidden: "" },
+    icon("refresh"),
+    element("span", { class: "hunch-chip-count" }, ""),
+  );
   private verdictState: NonNullable<Status["verdict"]> = { text: "", tone: "none" };
   private flashTimer: number | undefined;
 
@@ -96,7 +116,7 @@ export class FindBar {
     this.conditions = new ConditionList({ onChange: handlers.onChange, onSubmit: handlers.onSubmit });
     this.scope.append(new Option("整页", "page"), new Option("仅正文", "article"), new Option("当前选区", "selection"));
     this.combination.append(new Option("全部满足", "all"), new Option("任一满足", "any"));
-    this.savedButton.setAttribute("aria-label", "已存摘录");
+    for (const value of THRESHOLDS) this.threshold.append(new Option(`阈值 ${value.toFixed(1)}`, String(value)));
     const submit = element(
       "button",
       { type: "button", class: "hunch-submit", title: "搜索 (Enter)", "aria-label": "搜索" },
@@ -126,11 +146,13 @@ export class FindBar {
         this.scope,
         this.scopeButton,
         this.combination,
-        this.verdict,
-        this.meta,
-        this.savedButton,
+        element("span", { class: "hunch-spacer" }),
+        this.retryButton,
+        this.refreshButton,
+        this.threshold,
         this.themeButton,
       ),
+      this.status,
       element("div", { class: "hunch-progress" }, this.progress),
     );
     this.paintMode();
@@ -140,9 +162,11 @@ export class FindBar {
     close.addEventListener("click", handlers.onClose);
     prev.addEventListener("click", () => handlers.onStep(-1));
     next.addEventListener("click", () => handlers.onStep(1));
-    this.savedButton.addEventListener("click", handlers.onSaved);
     this.scopeButton.addEventListener("click", handlers.onScopeVisible);
     this.themeButton.addEventListener("click", handlers.onTheme);
+    this.refreshButton.addEventListener("click", handlers.onRefresh);
+    this.retryButton.addEventListener("click", handlers.onRetry);
+    this.threshold.addEventListener("change", () => handlers.onThreshold(Number(this.threshold.value)));
     const pickMode = (value: SearchMode) => {
       if (value === this.modeValue) return;
       this.modeValue = value;
@@ -160,7 +184,8 @@ export class FindBar {
         other.focus();
       });
     }
-    for (const select of [this.scope, this.combination]) select.addEventListener("change", handlers.onChange);
+    this.scope.addEventListener("change", handlers.onScope);
+    this.combination.addEventListener("change", handlers.onChange);
     this.root.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !event.isComposing) handlers.onClose();
     });
@@ -201,9 +226,6 @@ export class FindBar {
     this.conditions.root.hidden = !conditional;
     this.combination.hidden = !conditional;
   }
-  setSavedOpen(open: boolean) {
-    this.savedButton.setAttribute("aria-pressed", String(open));
-  }
   setScopeVisible(on: boolean) {
     this.scopeButton.setAttribute("aria-pressed", String(on));
   }
@@ -213,8 +235,19 @@ export class FindBar {
     this.themeButton.title = `${label}（点击切换）`;
     this.themeButton.setAttribute("aria-label", label);
   }
-  setSavedCount(count: number) {
-    this.savedButton.lastElementChild!.textContent = String(count);
+  // `count` new blocks appeared since the last search; 0 hides the chip.
+  setPending(count: number) {
+    this.refreshButton.hidden = !count;
+    this.refreshButton.lastElementChild!.textContent = count ? `新增 ${count}` : "";
+    this.refreshButton.setAttribute("aria-label", `搜索新增的 ${count} 个文字块`);
+  }
+  setRetry(count: number) {
+    this.retryButton.hidden = !count;
+    this.retryButton.lastElementChild!.textContent = count ? `重试 ${count}` : "";
+    this.retryButton.setAttribute("aria-label", `重新搜索失败的 ${count} 个文字块`);
+  }
+  setThreshold(value: number) {
+    this.threshold.value = String(value);
   }
   // Briefly replaces the status line with a confirmation, then restores the search verdict.
   flash(message: string) {
@@ -226,13 +259,20 @@ export class FindBar {
   private paintVerdict({ text, tone }: NonNullable<Status["verdict"]>) {
     this.verdict.textContent = text;
     this.verdict.className = `hunch-verdict hunch-${tone}`;
+    this.paintStatus();
+  }
+  private paintStatus() {
+    this.status.hidden = !this.verdict.textContent && !this.meta.textContent;
   }
   set(status: Status) {
     if (status.counter !== undefined) {
       this.counter.textContent = status.counter;
       this.stepper.hidden = !status.counter;
     }
-    if (status.meta !== undefined) this.meta.textContent = status.meta;
+    if (status.meta !== undefined) {
+      this.meta.textContent = status.meta;
+      this.paintStatus();
+    }
     if (status.verdict) {
       clearTimeout(this.flashTimer);
       this.verdictState = status.verdict;

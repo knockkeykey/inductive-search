@@ -1,3 +1,10 @@
+/* Registered at document level so the outline's gradient angle in the shadow UI can animate smoothly. */
+@property --hunch-scope-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 /* Page-scope highlights, modeled on Safari's Find on Page. */
 .hunch-hl {
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own background */
@@ -54,7 +61,7 @@
   }
 }
 
-/* Search range tint for 当前选区, kept faint so it reads as context rather than a result. */
+/* Search range tint for 当前选区, visible but lighter than result highlights. */
 ::highlight(hunch-scope) {
-  background-color: rgba(0, 122, 255, 0.14);
+  background-color: rgba(0, 122, 255, 0.22);
 }

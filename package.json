@@ -2,7 +2,7 @@
   "name": "inductive-search",
   "version": "1.1.0",
   "private": true,
-  "description": "感应式搜索：按条件查找网页原文，查看限定范围的搜索结果，并保存本地摘录。基于 Hunch。",
+  "description": "感应式搜索：按意思或按条件查找网页原文，并在网页上高亮结果。基于 Hunch。",
   "author": "tymscar",
   "license": "MIT",
   "repository": {
@@ -25,7 +25,9 @@
     "package": "npm run build && web-ext build --source-dir dist/firefox --artifacts-dir web-ext-artifacts/firefox --overwrite-dest && web-ext build --source-dir dist/chrome --artifacts-dir web-ext-artifacts/chrome --overwrite-dest"
   },
   "dependencies": {
-    "@typesafe-ai/sdk": "^0.6.0"
+    "@typesafe-ai/sdk": "^0.6.0",
+    "mammoth": "1.13.0",
+    "pdfjs-dist": "6.4.299"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",

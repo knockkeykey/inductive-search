@@ -83,9 +83,7 @@ export async function answer(
             a.noul < 0 ||
             a.noul > 1
           ) {
-            throw new Error(
-              `${PROVIDERS[settings.provider].name} 返回了无效的 Jev 概率（${questionId}）。`,
-            );
+            throw new Error(`${PROVIDERS[settings.provider].name} 返回了无效的 Jev 概率（${questionId}）。`);
           }
           return a.noul;
         });

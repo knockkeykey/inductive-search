@@ -160,8 +160,7 @@ async function save() {
   saveButton.disabled = true;
   provider.disabled = true;
   try {
-    if (!(await requestApiAccess(s.provider)))
-      throw new Error(`未获准访问 ${PROVIDERS[s.provider].name}。`);
+    if (!(await requestApiAccess(s.provider))) throw new Error(`未获准访问 ${PROVIDERS[s.provider].name}。`);
     await saveSettings(s);
     drafts[s.provider] = s;
     showKeyBanner(Boolean(s.apiKey));

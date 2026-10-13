@@ -1,4 +1,4 @@
-import type { Hit } from "./hits";
+import { type Hit, pageTop } from "./hits";
 
 export class ScrollMarks {
   readonly root: HTMLElement;
@@ -19,7 +19,7 @@ export class ScrollMarks {
     for (const hit of hits) {
       const m = document.createElement("div");
       m.className = hit === current ? "hunch-mark hunch-mark-current" : "hunch-mark";
-      m.style.top = `${((hit.el.getBoundingClientRect().top + window.scrollY) / height) * 100}%`;
+      m.style.top = `${(pageTop(hit.el) / height) * 100}%`;
       m.style.opacity = hit === current ? "1" : String(0.4 + 0.6 * hit.p);
       m.title = `${Math.round(hit.p * 100)}%`;
       m.addEventListener("click", () => this.onPick(hit));

@@ -159,7 +159,7 @@ test("OpenLux rejects chat responses, missing answers and invalid probabilities"
     globalThis.fetch = async () => json(response);
     await assert.rejects(
       answer(search, { ...defaultSettings("openlux"), apiKey: "openlux-test-key" }, new AbortController().signal, () => {}),
-      /OpenLux returned an invalid Jev probability/,
+      /OpenLux 返回了无效的 Jev 概率/,
     );
   }
 });
@@ -171,7 +171,7 @@ test("model discovery adapts OpenRouter's shape and excludes chat models", async
     return json({ data: [{ id: "typesafe/jev-1.13", name: "Jev" }, { id: "typesafe/jev-router", name: "Chat router" }, { id: "openai/gpt-test", name: "Chat" }] });
   };
   assert.deepEqual(await listModels(defaultSettings("openrouter")), [
-    { name: "~typesafe/jev-latest", description: "Latest Jev" },
+    { name: "~typesafe/jev-latest", description: "最新 Jev" },
     { name: "typesafe/jev-1.13", description: "Jev" },
   ]);
   globalThis.fetch = async () => json({ models: [{ name: "jev-1.13", description: "Jev" }] });

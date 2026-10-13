@@ -192,7 +192,7 @@ textarea::placeholder {
     0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-/* Floating dock: an optional result card stacked on a Spotlight-style command bar */
+/* Floating dock: a Spotlight-style command bar */
 .hunch-dock {
   position: absolute;
   left: 16px;
@@ -204,8 +204,7 @@ textarea::placeholder {
   flex-direction: column;
   gap: 8px;
 }
-.hunch-bar,
-.hunch-peek {
+.hunch-bar {
   pointer-events: auto;
 }
 .hunch-bar {
@@ -387,8 +386,7 @@ textarea::placeholder {
   cursor: grabbing;
   user-select: none;
 }
-.hunch-dragging .hunch-bar,
-.hunch-dragging .hunch-peek {
+.hunch-dragging .hunch-bar {
   box-shadow:
     inset 0 0.5px 0 var(--hunch-highlight-edge),
     0 0 0 0.5px var(--hunch-edge),
@@ -489,8 +487,7 @@ textarea::placeholder {
   background: var(--hunch-accent-tint);
   color: var(--hunch-accent-text);
 }
-.hunch-chip[aria-pressed="true"] .hunch-icon,
-.hunch-action.hunch-on .hunch-icon {
+.hunch-chip[aria-pressed="true"] .hunch-icon {
   fill: currentColor;
 }
 /* Outline-only icons stay hollow when their toggle is on. */
@@ -505,13 +502,29 @@ textarea::placeholder {
 .hunch-scope-toggle[aria-pressed="false"]:hover {
   color: var(--hunch-label);
 }
-.hunch-verdict {
+.hunch-spacer {
   flex: 1;
+}
+/* Full-width status row under the toolbar: messages wrap and can be selected and copied. */
+.hunch-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0 -6px -6px;
+  padding: 6px 14px 8px;
+  border-top: 0.5px solid var(--hunch-separator);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--hunch-secondary-label);
+  user-select: text;
+  cursor: text;
+}
+.hunch-verdict {
+  flex: 1 1 auto;
   min-width: 0;
-  margin-left: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .hunch-found {
   color: var(--hunch-green);
@@ -551,182 +564,52 @@ textarea::placeholder {
   opacity: 1;
 }
 
-/* Result card above the bar */
-.hunch-peek {
-  display: flex;
-  flex-direction: column;
-  max-height: min(42vh, 380px);
-  padding: 8px 8px 12px 14px;
-  border-radius: 16px;
-  overflow: hidden;
-  transform-origin: 50% 100%;
-  animation: hunch-peek-in 0.28s var(--hunch-ease);
-}
-.hunch-peek-hit,
-.hunch-peek-saved {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.hunch-peek-header,
-.hunch-saved-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-height: 28px;
-}
-.hunch-peek-title {
-  flex: 1;
-  min-width: 0;
-  margin-left: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--hunch-secondary-label);
-}
-.hunch-peek-saved .hunch-peek-title {
-  margin-left: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--hunch-label);
-}
-.hunch-score {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--hunch-accent-tint);
-  color: var(--hunch-accent-text);
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.hunch-excerpt-text {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-.hunch-peek-hit .hunch-excerpt-text {
-  min-height: 0;
-  margin-top: 4px;
-  padding-right: 6px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--hunch-fill-hover) transparent;
-}
-.hunch-action {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--hunch-secondary-label);
-}
-.hunch-action:hover {
-  background: var(--hunch-fill);
-  color: var(--hunch-label);
-}
-.hunch-action.hunch-on {
-  color: var(--hunch-accent);
-  opacity: 1;
-}
-.hunch-action.hunch-destructive:hover {
-  background: rgba(255, 59, 48, 0.12);
-  color: var(--hunch-red);
-}
-.hunch-condition-evidence {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 11px;
-}
-.hunch-condition-evidence li {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--hunch-fill);
-  color: var(--hunch-secondary-label);
-  overflow-wrap: anywhere;
-}
-.hunch-condition-evidence .hunch-pass {
-  background: rgba(52, 199, 89, 0.14);
-  color: var(--hunch-green);
-}
-.hunch-saved-list {
-  min-height: 0;
-  margin-top: 4px;
-  padding-right: 6px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--hunch-fill-hover) transparent;
-}
-.hunch-saved {
-  padding: 8px 0;
-}
-.hunch-saved + .hunch-saved {
-  border-top: 0.5px solid var(--hunch-separator);
-}
-.hunch-saved .hunch-excerpt-text {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-  font-size: 13px;
-  line-height: 1.6;
-}
-.hunch-source {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--hunch-accent);
-  font-size: 12px;
-  font-weight: 500;
-  text-decoration: none;
-}
-.hunch-source:hover {
-  text-decoration: underline;
-}
-.hunch-saved-date {
-  flex: none;
-  margin: 0 4px;
-  font-size: 11px;
-  color: var(--hunch-tertiary-label);
-  font-variant-numeric: tabular-nums;
-}
-.hunch-empty {
-  margin: 0;
-  padding: 24px 16px;
-  text-align: center;
-  line-height: 1.7;
-  color: var(--hunch-secondary-label);
-}
-
-/* Search range outline: present but quiet, never intercepts the page. */
+/* Search range outline: a thin Apple Intelligence-style flowing rainbow line. Never intercepts the page. */
 .hunch-scope {
+  --hunch-scope-ring: 1.5px;
+  --hunch-scope-glow: 3px;
+  --hunch-scope-colors: #ff5c8a, #ff9f45, #b86bff, #6c7bff, #3cb4ff, #ff5c8a;
   position: fixed;
-  border: 1px dashed light-dark(rgba(0, 122, 255, 0.45), rgba(10, 132, 255, 0.55));
   border-radius: 10px;
-  background: light-dark(rgba(0, 122, 255, 0.03), rgba(10, 132, 255, 0.05));
   pointer-events: none;
   transition: opacity 0.2s;
 }
+.hunch-scope::before,
+.hunch-scope::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: var(--hunch-scope-ring);
+  border-radius: inherit;
+  background: conic-gradient(from var(--hunch-scope-angle, 0deg), var(--hunch-scope-colors));
+  /* Keep only the border band of the gradient. */
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: hunch-scope-spin 4s linear infinite;
+}
+/* Faint halo hugging the line. */
+.hunch-scope::after {
+  padding: var(--hunch-scope-glow);
+  inset: calc((var(--hunch-scope-glow) - var(--hunch-scope-ring)) / -2);
+  filter: blur(4px);
+  opacity: 0.35;
+}
+/* The viewport frame sits flush with the window edge. */
 .hunch-scope-page {
-  border-style: solid;
-  border-color: light-dark(rgba(0, 122, 255, 0.28), rgba(10, 132, 255, 0.4));
-  border-radius: 12px;
-  background: none;
+  --hunch-scope-ring: 2px;
+  --hunch-scope-glow: 6px;
+  border-radius: 0;
+}
+.hunch-scope-page::after {
+  inset: 0;
+  filter: blur(6px);
+  opacity: 0.3;
+}
+@keyframes hunch-scope-spin {
+  to {
+    --hunch-scope-angle: 360deg;
+  }
 }
 .hunch-scope-label {
   position: absolute;
@@ -739,9 +622,8 @@ textarea::placeholder {
   box-shadow: 0 0 0 0.5px var(--hunch-edge);
   color: var(--hunch-accent-text);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
-  opacity: 0.85;
 }
 /* The viewport frame speaks for itself; a label there would sit on page content. */
 .hunch-scope-page .hunch-scope-label {
@@ -803,12 +685,6 @@ textarea::placeholder {
     transform: translateY(12px) scale(0.98);
   }
 }
-@keyframes hunch-peek-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-}
 @media (max-width: 700px) {
   .hunch-dock {
     left: 8px;
@@ -818,19 +694,12 @@ textarea::placeholder {
   .hunch-toolbar {
     flex-wrap: wrap;
   }
-  .hunch-verdict {
-    order: 1;
-    flex-basis: 100%;
-    margin: 2px 0 0 4px;
-  }
-  .hunch-meta {
-    display: none;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,
   .hunch-bar,
-  .hunch-peek {
+  .hunch-scope::before,
+  .hunch-scope::after {
     animation: none;
     transition: none;
   }

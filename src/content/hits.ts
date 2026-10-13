@@ -1,8 +1,10 @@
+import browser from "webextension-polyfill";
 import type { BlockId } from "../shared/protocol";
 import { THRESHOLD } from "../shared/questions";
-import type { PageBlock } from "./blocks";
+import { type Ranked, rank } from "../shared/ranking";
+import { computed, type PageBlock } from "./blocks";
 
-export interface Hit extends PageBlock {
+export interface Hit extends PageBlock, Partial<Pick<Ranked, "keyword">> {
   p: number;
   conditionScores: number[];
 }
@@ -11,38 +13,70 @@ export function rankHits(
   blocks: readonly PageBlock[],
   scores: Record<BlockId, number>,
   conditionScores: Record<BlockId, number[]> = {},
+  options: { threshold?: number; terms?: readonly string[] } = {},
 ): Hit[] {
-  return blocks
-    .map((b) => ({ ...b, p: scores[b.id] ?? 0, conditionScores: conditionScores[b.id] ?? [] }))
-    .filter((h) => h.p >= THRESHOLD)
-    .sort((a, b) => b.p - a.p);
+  return rank(blocks, scores, conditionScores, options);
 }
 
-export function paint(hits: readonly Hit[]) {
+// Hits can live in shadow trees and same-origin iframes, which document.querySelectorAll can't see.
+const painted = new Set<HTMLElement>();
+const styled = new WeakSet<Node>();
+
+// content.css is only inserted into the top document; give other roots their own copy.
+function ensureStyles(el: HTMLElement) {
+  const root = el.getRootNode();
+  if (root === document || styled.has(root)) return;
+  const target = root.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root : (root as Document).head;
+  if (!target) return;
+  styled.add(root);
+  const link = el.ownerDocument.createElement("link");
+  link.rel = "stylesheet";
+  link.href = browser.runtime.getURL("content.css");
+  link.dataset.hunch = "";
+  target.appendChild(link);
+}
+
+export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
   clearPaint();
-  const seen = new Set<HTMLElement>();
   for (const { el, p } of hits) {
-    if (seen.has(el)) continue;
-    seen.add(el);
+    if (painted.has(el)) continue;
+    painted.add(el);
+    ensureStyles(el);
     el.classList.add("hunch-hl");
 
-    if (getComputedStyle(el).position === "static") el.classList.add("hunch-rel");
+    if (computed(el).position === "static") el.classList.add("hunch-rel");
 
-    el.style.setProperty("--hunch-alpha", (0.15 + 0.6 * ((p - THRESHOLD) / (1 - THRESHOLD))).toFixed(2));
+    // Keyword-only hits sit below the threshold; give them the faintest highlight.
+    const strength = Math.max(0, (p - threshold) / (1 - threshold));
+    el.style.setProperty("--hunch-alpha", (0.15 + 0.6 * strength).toFixed(2));
     el.dataset.hunchP = p.toFixed(2);
   }
 }
 
 export function clearPaint() {
-  for (const el of document.querySelectorAll<HTMLElement>(".hunch-hl")) {
+  for (const el of [...painted, ...document.querySelectorAll<HTMLElement>(".hunch-hl")]) {
     el.classList.remove("hunch-hl", "hunch-rel", "hunch-current");
     el.style.removeProperty("--hunch-alpha");
     delete el.dataset.hunchP;
   }
+  painted.clear();
 }
 
 export function markCurrent(prev: Hit | undefined, next: Hit | undefined, { scroll = true } = {}) {
   prev?.el.classList.remove("hunch-current");
   next?.el.classList.add("hunch-current");
   if (scroll) next?.el.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+// Position in the top document, adding the offsets of any same-origin frames on the way up.
+export function pageTop(el: HTMLElement): number {
+  let top = el.getBoundingClientRect().top;
+  let view = el.ownerDocument.defaultView;
+  while (view && view !== window) {
+    const frame = view.frameElement as HTMLElement | null;
+    if (!frame) break;
+    top += frame.getBoundingClientRect().top;
+    view = frame.ownerDocument.defaultView;
+  }
+  return top + window.scrollY;
 }

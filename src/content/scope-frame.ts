@@ -56,7 +56,7 @@ export class ScopeFrame {
     this.frame = 0;
     if (!this.scope) return;
     if (this.scope === "page") {
-      this.place(EDGE, EDGE, window.innerWidth - EDGE, window.innerHeight - EDGE);
+      this.place(0, 0, window.innerWidth, window.innerHeight);
       return;
     }
     const rect = this.scope === "article" ? this.target?.getBoundingClientRect() : this.selectionRect();

@@ -1,36 +1,42 @@
 import browser from "webextension-polyfill";
 import { answer } from "./background/answer";
-import { handleExcerpts } from "./background/excerpts";
 import { PROVIDERS } from "./shared/api";
-import type { ExcerptRequest } from "./shared/excerpts";
-import { SEARCH_PORT, type Search, type SearchEvent, type TabMessage } from "./shared/protocol";
+import { documentKind, VIEWER_PAGE, viewerQuery } from "./shared/documents";
+import { hasContentScript, injectContentScript, sendToTab } from "./shared/inject";
+import { SEARCH_PORT, type Search, type SearchEvent } from "./shared/protocol";
 import { hasApiAccess, loadSettings } from "./shared/settings";
 
-async function toggle(tabId: number | undefined) {
+async function toggle(tab: browser.Tabs.Tab) {
+  const tabId = tab.id;
   if (tabId === undefined) return;
+  const url = tab.url ?? "";
+  if (url.startsWith(browser.runtime.getURL(VIEWER_PAGE))) {
+    await browser.runtime.sendMessage({ type: "viewer-toggle", tabId }).catch(() => undefined);
+    return;
+  }
+  // The browser's own PDF viewer has no searchable DOM; open the document in ours instead.
+  const navigable = /^(https?|file):/.test(url);
+  if (navigable && documentKind(url)) return openInViewer(tabId, url);
+  if (await hasContentScript(tabId)) return void (await sendToTab(tabId, { type: "toggle" }));
+  if (navigable && (await isPdfTab(tabId))) return openInViewer(tabId, url);
   // Opening the bar must not depend on an API permission prompt. Chrome loses the
   // user gesture after async storage reads; request provider access from Save instead.
-  if (!(await ensureContentScript(tabId))) return unavailable(tabId);
+  if (!(await injectContentScript(tabId))) return unavailable(tabId);
   await sendToTab(tabId, { type: "toggle" });
 }
 
-async function ensureContentScript(tabId: number): Promise<boolean> {
-  if (await hasContentScript(tabId)) return true;
-  try {
-    await browser.scripting.insertCSS({ target: { tabId }, files: ["content.css"] });
-    await browser.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
-    return true;
-  } catch {
-    return false;
-  }
+async function openInViewer(tabId: number, url: string) {
+  await browser.tabs.update(tabId, { url: browser.runtime.getURL(`${viewerQuery(url)}&open=1`) });
 }
 
-const sendToTab = (tabId: number, msg: TabMessage) => browser.tabs.sendMessage(tabId, msg);
-
-async function hasContentScript(tabId: number): Promise<boolean> {
+// PDFs served without a .pdf path (e.g. arxiv.org/pdf/…) are recognised by their content type.
+async function isPdfTab(tabId: number): Promise<boolean> {
   try {
-    await sendToTab(tabId, { type: "ping" });
-    return true;
+    const [result] = await browser.scripting.executeScript({
+      target: { tabId },
+      func: () => document.contentType,
+    });
+    return result?.result === "application/pdf";
   } catch {
     return false;
   }
@@ -52,24 +58,21 @@ browser.runtime.onInstalled.addListener(async ({ reason }) => {
 
 browser.action.onClicked.addListener(async (tab) => {
   try {
-    await toggle(tab.id);
+    await toggle(tab);
   } catch (error) {
     console.error("感应式搜索 activation failed:", error);
     if (tab.id !== undefined) await unavailable(tab.id);
   }
 });
 
-browser.runtime.onMessage.addListener((message: unknown) => {
-  const request = message as ExcerptRequest;
-  if (["excerpt-list", "excerpt-save", "excerpt-delete"].includes(request?.type)) return handleExcerpts(request);
-  return undefined;
-});
-
 browser.runtime.onConnect.addListener((port) => {
   if (port.name !== SEARCH_PORT) return;
   const abort = new AbortController();
   port.onDisconnect.addListener(() => abort.abort());
-  port.onMessage.addListener((msg: unknown) => void run(msg as Search));
+  // The content script pings while a search runs so Chrome doesn't stop this worker mid-search.
+  port.onMessage.addListener((msg: unknown) => {
+    if ((msg as { type?: string })?.type !== "keepalive") void run(msg as Search);
+  });
 
   const emit = (e: SearchEvent) => {
     if (!abort.signal.aborted) port.postMessage(e);
