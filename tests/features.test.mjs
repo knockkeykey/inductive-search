@@ -118,7 +118,7 @@ test('page/article/selection scopes keep their boundaries and repeated occurrenc
   dom.window.close();
 });
 
-test('sidebar submits two-character queries, renders evidence, saves source and aborts without a delayed search', async () => {
+test('find bar submits two-character queries, renders evidence, saves source and aborts without a delayed search', async () => {
   const dom = domFixture(); const w = dom.window;
   const requests = [];
   let toggle; let shadow;
@@ -144,6 +144,18 @@ test('sidebar submits two-character queries, renders evidence, saves source and 
   toggle({ type: 'toggle' });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(document.querySelector('hunch-ui').shadowRoot, null, 'saved excerpts must use a closed shadow root');
+  const frame = shadow.querySelector('.hunch-scope');
+  assert.ok(!frame.hidden && frame.textContent.includes('整页'), 'the search range is outlined by default while the bar is open');
+  const scopeToggle = shadow.querySelector('[aria-label="标出搜索范围"]');
+  scopeToggle.click();
+  assert.ok(frame.hidden && scopeToggle.getAttribute('aria-pressed') === 'false');
+  scopeToggle.click();
+  assert.ok(!frame.hidden);
+  const host = document.querySelector('hunch-ui');
+  const themeToggle = shadow.querySelector('.hunch-theme-toggle');
+  themeToggle.click(); assert.equal(host.dataset.theme, 'light');
+  themeToggle.click(); assert.equal(host.dataset.theme, 'dark');
+  themeToggle.click(); assert.equal(host.dataset.theme, undefined, 'third click returns to following the system');
   const input = shadow.querySelector('input');
   input.value = '退款'; input.dispatchEvent(new w.Event('input'));
   assert.equal(requests.length, 0, 'typing alone must not spend an API request');
@@ -152,9 +164,13 @@ test('sidebar submits two-character queries, renders evidence, saves source and 
   input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter' }));
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(requests[0].query, '退款');
-  assert.ok(shadow.querySelector('.hunch-result-pick').textContent.includes('语义评分'));
-  const saveButton = [...shadow.querySelectorAll('.hunch-result-actions button')].find(b => b.textContent === '保存摘录');
+  assert.ok(shadow.querySelector('.hunch-peek-hit').textContent.includes('语义'));
+  assert.ok(!shadow.querySelector('.hunch-sidebar'), 'results must not open a sidebar');
+  const saveButton = shadow.querySelector('.hunch-peek-hit [aria-label="保存摘录"]');
   saveButton.click(); await new Promise(resolve => setImmediate(resolve));
+  assert.ok(shadow.querySelector('.hunch-peek-hit [aria-label="已保存"]').disabled);
+  shadow.querySelector('[aria-label="已存摘录"]').click(); await new Promise(resolve => setImmediate(resolve));
+  assert.ok(shadow.querySelector('.hunch-peek-saved:not([hidden]) .hunch-saved'), 'saved excerpts open in the card above the bar');
   assert.ok(globalThis.hunchFeatureStorage.excerpts.some(e => e.query === '退款' && e.url === 'https://example.com/article'));
   const scope = shadow.querySelector('[aria-label="搜索范围"]');
   scope.value = 'article'; scope.dispatchEvent(new w.Event('change'));
@@ -167,18 +183,30 @@ test('sidebar submits two-character queries, renders evidence, saves source and 
   document.dispatchEvent(new w.Event('selectionchange'));
   scope.value = 'selection'; scope.dispatchEvent(new w.Event('change'));
   const mode = shadow.querySelector('[aria-label="查找方式"]');
-  mode.value = 'conditions'; mode.dispatchEvent(new w.Event('change'));
-  const conditions = shadow.querySelector('textarea'); conditions.value = '有证据';
+  mode.querySelector('[data-value="conditions"]').click();
+  assert.equal(mode.querySelector('[data-value="conditions"]').getAttribute('aria-checked'), 'true');
+  assert.ok(!shadow.querySelector('textarea'), 'conditions are separate rows, not a free-form textarea');
+  const first = shadow.querySelector('.hunch-condition-input'); first.value = '有证据';
+  first.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter' }));
+  assert.equal(requests.length, 2, 'Enter on a filled condition adds a row instead of searching');
+  const rows = shadow.querySelectorAll('.hunch-condition-input');
+  assert.equal(rows.length, 2);
+  assert.equal(shadow.activeElement, rows[1]);
+  rows[1].dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Backspace' }));
+  assert.equal(shadow.querySelectorAll('.hunch-condition-input').length, 1, 'Backspace on an empty row removes it');
+  assert.ok(shadow.querySelector('.hunch-grabber'), 'the dock has a drag handle');
   const combination = shadow.querySelector('[aria-label="条件组合"]'); combination.value = 'any';
   shadow.querySelector('.hunch-submit').click();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(requests[2].blocks[0].text, 'selected');
   assert.equal(requests[2].mode, 'conditions');
   assert.equal(requests[2].combination, 'any');
+  assert.equal(JSON.stringify(requests[2].conditions), '["有证据"]');
   assert.ok(shadow.querySelector('.hunch-condition-evidence').textContent.includes('有证据'));
   input.value = '新搜索'; input.dispatchEvent(new w.Event('input'));
   toggle({ type: 'toggle' });
   await new Promise(resolve => setTimeout(resolve, 350));
   assert.equal(requests.length, 3, 'closing must not allow delayed searches');
+  assert.ok(frame.hidden, 'the range outline goes away with the bar');
   dom.window.close();
 });

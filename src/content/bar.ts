@@ -1,6 +1,14 @@
 import type { Combination, SearchMode, SearchScope } from "../shared/protocol";
-import { parseConditions } from "../shared/questions";
+import { ConditionList } from "./condition-list";
 import { element } from "./element";
+import { icon } from "./icons";
+
+export type Theme = "auto" | "light" | "dark";
+const THEMES: Record<Theme, { icon: Parameters<typeof icon>[0]; label: string }> = {
+  auto: { icon: "circleHalf", label: "外观：跟随系统" },
+  light: { icon: "sun", label: "外观：浅色" },
+  dark: { icon: "moon", label: "外观：深色" },
+};
 
 export interface SearchControls {
   query: string;
@@ -14,7 +22,9 @@ export interface BarHandlers {
   onChange(): void;
   onStep(dir: 1 | -1): void;
   onClose(): void;
-  onPanel(): void;
+  onSaved(): void;
+  onScopeVisible(): void;
+  onTheme(): void;
 }
 export interface Status {
   counter?: string;
@@ -23,137 +33,210 @@ export interface Status {
   progress?: { done: number; total: number };
 }
 
+function iconButton(name: Parameters<typeof icon>[0], label: string, extra = "") {
+  return element(
+    "button",
+    { type: "button", class: `hunch-icon-button ${extra}`.trim(), title: label, "aria-label": label },
+    icon(name),
+  );
+}
+
+// A Spotlight-style command bar: one prominent field on top, compact chips underneath.
 export class FindBar {
   readonly root: HTMLElement;
   private readonly input = element("input", {
     class: "hunch-input",
     type: "text",
-    placeholder: "输入问题，按 Enter 搜索",
+    placeholder: "问点什么，例如「父亲去买什么了」",
     "aria-label": "搜索问题",
     maxlength: "1000",
     autocomplete: "off",
   });
-  private readonly conditions = element("textarea", {
-    class: "hunch-conditions",
-    placeholder: "每行一个条件，例如：\n包含作者实际测试的结果\n给出了具体数据",
-    "aria-label": "搜索条件，每行一个",
-    rows: "3",
-    maxlength: "3000",
-  });
-  private readonly mode = element("select", { "aria-label": "查找方式" });
-  private readonly scope = element("select", { "aria-label": "搜索范围" });
-  private readonly combination = element("select", { "aria-label": "条件组合" });
+  private readonly conditions: ConditionList;
+  private readonly modeButtons = [
+    element("button", { type: "button", role: "radio", "data-value": "semantic" }, "按意思"),
+    element("button", { type: "button", role: "radio", "data-value": "conditions" }, "按条件"),
+  ];
+  private readonly mode = element(
+    "div",
+    { class: "hunch-segmented", role: "radiogroup", "aria-label": "查找方式" },
+    ...this.modeButtons,
+  );
+  private modeValue: SearchMode = "semantic";
+  private readonly scope = element("select", { class: "hunch-chip-select", "aria-label": "搜索范围" });
+  private readonly combination = element("select", { class: "hunch-chip-select", "aria-label": "条件组合" });
+  private readonly leading = element("span", { class: "hunch-field-icon" }, icon("magnifier"));
   private readonly counter = element("span", { class: "hunch-counter" });
+  private readonly stepper: HTMLElement;
   private readonly verdict = element("span", { class: "hunch-verdict", role: "status", "aria-live": "polite" });
   private readonly meta = element("span", { class: "hunch-meta" });
   private readonly progress = element("div", { class: "hunch-progress-fill" });
-  private readonly panelButton = element(
+  private readonly savedButton = element(
     "button",
-    { type: "button", class: "hunch-nav", "aria-expanded": "true" },
-    "结果 / 摘录",
+    { type: "button", class: "hunch-chip", "aria-pressed": "false", title: "已存摘录" },
+    icon("bookmark"),
+    element("span", { class: "hunch-chip-count" }, "0"),
   );
+  private readonly scopeButton = element(
+    "button",
+    {
+      type: "button",
+      class: "hunch-chip hunch-scope-toggle",
+      "aria-pressed": "true",
+      title: "在网页上标出搜索范围",
+      "aria-label": "标出搜索范围",
+    },
+    icon("viewfinder"),
+  );
+  private readonly themeButton = element("button", { type: "button", class: "hunch-chip hunch-theme-toggle" });
+  private verdictState: NonNullable<Status["verdict"]> = { text: "", tone: "none" };
+  private flashTimer: number | undefined;
 
   constructor(handlers: BarHandlers) {
-    this.mode.append(new Option("按意思找", "semantic"), new Option("按条件找", "conditions"));
+    this.conditions = new ConditionList({ onChange: handlers.onChange, onSubmit: handlers.onSubmit });
     this.scope.append(new Option("整页", "page"), new Option("仅正文", "article"), new Option("当前选区", "selection"));
     this.combination.append(new Option("全部满足", "all"), new Option("任一满足", "any"));
-    this.conditions.hidden = true;
-    this.combination.hidden = true;
-    const submit = element("button", { type: "button", class: "hunch-submit" }, "搜索");
-    const prev = element(
+    this.savedButton.setAttribute("aria-label", "已存摘录");
+    const submit = element(
       "button",
-      { type: "button", class: "hunch-nav", title: "上一个结果", "aria-label": "上一个结果" },
-      "▲",
+      { type: "button", class: "hunch-submit", title: "搜索 (Enter)", "aria-label": "搜索" },
+      icon("arrowUp"),
     );
-    const next = element(
-      "button",
-      { type: "button", class: "hunch-nav", title: "下一个结果", "aria-label": "下一个结果" },
-      "▼",
-    );
-    const close = element(
-      "button",
-      { type: "button", class: "hunch-close", title: "关闭 (Esc)", "aria-label": "关闭感应式搜索" },
-      "✕",
-    );
+    const prev = iconButton("chevronUp", "上一个结果 (Shift+Enter)");
+    const next = iconButton("chevronDown", "下一个结果");
+    const close = iconButton("xmark", "关闭 (Esc)", "hunch-close");
+    this.stepper = element("span", { class: "hunch-stepper" }, prev, this.counter, next);
     this.root = element(
       "div",
-      { class: "hunch-bar", role: "search", "aria-label": "感应式搜索网页查找" },
+      { class: "hunch-bar hunch-material", role: "search", "aria-label": "感应式搜索网页查找" },
       element(
         "div",
-        { class: "hunch-controls" },
-        this.mode,
-        this.scope,
+        { class: "hunch-command" },
+        this.leading,
         this.input,
-        this.combination,
+        this.conditions.root,
+        this.stepper,
         submit,
-        this.panelButton,
         close,
       ),
-      this.conditions,
-      element("div", { class: "hunch-status" }, this.counter, prev, next, this.verdict, this.meta),
+      element(
+        "div",
+        { class: "hunch-toolbar" },
+        this.mode,
+        this.scope,
+        this.scopeButton,
+        this.combination,
+        this.verdict,
+        this.meta,
+        this.savedButton,
+        this.themeButton,
+      ),
       element("div", { class: "hunch-progress" }, this.progress),
     );
+    this.paintMode();
+    this.setTheme("auto");
+    this.set({ counter: "" });
     submit.addEventListener("click", handlers.onSubmit);
     close.addEventListener("click", handlers.onClose);
     prev.addEventListener("click", () => handlers.onStep(-1));
     next.addEventListener("click", () => handlers.onStep(1));
-    this.panelButton.addEventListener("click", handlers.onPanel);
-    this.mode.addEventListener("change", () => {
-      const conditional = this.mode.value === "conditions";
-      this.input.hidden = conditional;
-      this.conditions.hidden = !conditional;
-      this.combination.hidden = !conditional;
+    this.savedButton.addEventListener("click", handlers.onSaved);
+    this.scopeButton.addEventListener("click", handlers.onScopeVisible);
+    this.themeButton.addEventListener("click", handlers.onTheme);
+    const pickMode = (value: SearchMode) => {
+      if (value === this.modeValue) return;
+      this.modeValue = value;
+      this.paintMode();
       handlers.onChange();
       this.focus();
-    });
-    for (const select of [this.scope, this.combination]) select.addEventListener("change", handlers.onChange);
-    for (const input of [this.input, this.conditions]) {
-      input.addEventListener("input", (event) => {
-        if (!(event as InputEvent).isComposing) handlers.onChange();
-      });
-      input.addEventListener("compositionend", handlers.onChange);
-      input.addEventListener("keydown", (rawEvent) => {
-        const event = rawEvent as KeyboardEvent;
-        if (event.isComposing || event.keyCode === 229) return;
-        if (event.key === "Escape") handlers.onClose();
-        else if (event.key === "Enter" && (input === this.input || event.ctrlKey || event.metaKey)) {
-          event.preventDefault();
-          if (event.shiftKey) handlers.onStep(-1);
-          else handlers.onSubmit();
-        }
+    };
+    for (const button of this.modeButtons) {
+      button.addEventListener("click", () => pickMode(button.dataset.value as SearchMode));
+      button.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        event.preventDefault();
+        const other = this.modeButtons.find((b) => b !== button)!;
+        pickMode(other.dataset.value as SearchMode);
+        other.focus();
       });
     }
+    for (const select of [this.scope, this.combination]) select.addEventListener("change", handlers.onChange);
+    this.root.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !event.isComposing) handlers.onClose();
+    });
+    this.input.addEventListener("input", (event) => {
+      if (!(event as InputEvent).isComposing) handlers.onChange();
+    });
+    this.input.addEventListener("compositionend", handlers.onChange);
+    this.input.addEventListener("keydown", (event) => {
+      if (event.isComposing || event.keyCode === 229 || event.key !== "Enter") return;
+      event.preventDefault();
+      if (event.shiftKey) handlers.onStep(-1);
+      else handlers.onSubmit();
+    });
   }
 
   controls(): SearchControls {
     return {
       query: this.input.value.trim(),
-      mode: this.mode.value as SearchMode,
+      mode: this.modeValue,
       scope: this.scope.value as SearchScope,
       combination: this.combination.value as Combination,
-      conditions: parseConditions(this.conditions.value),
+      conditions: this.conditions.values(),
     };
   }
   focus() {
-    (this.mode.value === "conditions" ? this.conditions : this.input).focus();
+    (this.modeValue === "conditions" ? this.conditions : this.input).focus();
   }
-  setPanelOpen(open: boolean) {
-    this.panelButton.setAttribute("aria-expanded", String(open));
+  private paintMode() {
+    const conditional = this.modeValue === "conditions";
+    for (const button of this.modeButtons) {
+      const on = button.dataset.value === this.modeValue;
+      button.setAttribute("aria-checked", String(on));
+      button.tabIndex = on ? 0 : -1;
+    }
+    this.root.classList.toggle("hunch-multiline", conditional);
+    this.leading.hidden = conditional;
+    this.input.hidden = conditional;
+    this.conditions.root.hidden = !conditional;
+    this.combination.hidden = !conditional;
   }
-  setQuestionForSelection(question: string) {
-    this.mode.value = "semantic";
-    this.input.hidden = false;
-    this.conditions.hidden = true;
-    this.combination.hidden = true;
-    this.scope.value = "selection";
-    this.input.value = question;
+  setSavedOpen(open: boolean) {
+    this.savedButton.setAttribute("aria-pressed", String(open));
+  }
+  setScopeVisible(on: boolean) {
+    this.scopeButton.setAttribute("aria-pressed", String(on));
+  }
+  setTheme(theme: Theme) {
+    const { icon: name, label } = THEMES[theme];
+    this.themeButton.replaceChildren(icon(name));
+    this.themeButton.title = `${label}（点击切换）`;
+    this.themeButton.setAttribute("aria-label", label);
+  }
+  setSavedCount(count: number) {
+    this.savedButton.lastElementChild!.textContent = String(count);
+  }
+  // Briefly replaces the status line with a confirmation, then restores the search verdict.
+  flash(message: string) {
+    clearTimeout(this.flashTimer);
+    if (!message) return this.paintVerdict(this.verdictState);
+    this.paintVerdict({ text: message, tone: "none" });
+    this.flashTimer = window.setTimeout(() => this.paintVerdict(this.verdictState), 2400);
+  }
+  private paintVerdict({ text, tone }: NonNullable<Status["verdict"]>) {
+    this.verdict.textContent = text;
+    this.verdict.className = `hunch-verdict hunch-${tone}`;
   }
   set(status: Status) {
-    if (status.counter !== undefined) this.counter.textContent = status.counter;
+    if (status.counter !== undefined) {
+      this.counter.textContent = status.counter;
+      this.stepper.hidden = !status.counter;
+    }
     if (status.meta !== undefined) this.meta.textContent = status.meta;
     if (status.verdict) {
-      this.verdict.textContent = status.verdict.text;
-      this.verdict.className = `hunch-verdict hunch-${status.verdict.tone}`;
+      clearTimeout(this.flashTimer);
+      this.verdictState = status.verdict;
+      this.paintVerdict(status.verdict);
     }
     if (status.progress) {
       const { done, total } = status.progress;

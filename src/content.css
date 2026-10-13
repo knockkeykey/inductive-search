@@ -1,7 +1,8 @@
+/* Page-scope highlights, modeled on Safari's Find on Page. */
 .hunch-hl {
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own background */
-  background: rgba(251, 191, 36, var(--hunch-alpha, 0.3)) !important;
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, var(--hunch-alpha, 0.3));
+  background: rgba(255, 224, 102, var(--hunch-alpha, 0.3)) !important;
+  box-shadow: 0 0 0 3px rgba(255, 224, 102, var(--hunch-alpha, 0.3));
   border-radius: 3px;
   transition:
     background 0.15s,
@@ -13,18 +14,47 @@
 .hunch-hl.hunch-rel::after {
   content: attr(data-hunch-p);
   position: absolute;
-  top: -0.9em;
-  right: 0;
-  font: 10px / 1 monospace;
-  color: #92400e;
-  background: #fef3c7;
-  padding: 1px 4px;
-  border-radius: 3px;
-  opacity: 0.85;
+  top: -0.95em;
+  right: 2px;
+  font:
+    600 10px / 1 -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.62);
+  padding: 2px 6px;
+  border-radius: 999px;
   pointer-events: none;
 }
-.hunch-current {
+.hunch-hl.hunch-current {
+  /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own background */
+  background: #ffd60a !important;
+  /* biome-ignore lint/complexity/noImportantStyles: like Safari, keep text readable on opaque yellow even on dark pages */
+  color: #1d1d1f !important;
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own outline */
-  outline: 3px solid #ff5b5b !important;
-  outline-offset: 2px;
+  outline: none !important;
+  box-shadow:
+    0 0 0 3px #ffd60a,
+    0 2px 10px 3px rgba(0, 0, 0, 0.25);
+  animation: hunch-current-pop 0.15s ease-out;
+}
+@keyframes hunch-current-pop {
+  50% {
+    box-shadow:
+      0 0 0 7px #ffd60a,
+      0 4px 16px 7px rgba(0, 0, 0, 0.3);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hunch-hl,
+  .hunch-hl.hunch-current {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Search range tint for 当前选区, kept faint so it reads as context rather than a result. */
+::highlight(hunch-scope) {
+  background-color: rgba(0, 122, 255, 0.14);
 }

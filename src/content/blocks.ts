@@ -51,7 +51,7 @@ function visible(el: HTMLElement): boolean {
   );
 }
 
-function articleRoot(): HTMLElement {
+export function articleRoot(): HTMLElement {
   const candidates = [
     ...document.querySelectorAll<HTMLElement>(
       "article,main,[role='main'],#content,#article,.article-content,.post-content,.entry-content",

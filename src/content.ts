@@ -1,10 +1,11 @@
 import browser from "webextension-polyfill";
-import { FindBar } from "./content/bar";
+import { FindBar, type Theme } from "./content/bar";
 import { captureSelection, extractBlocks, type PageBlock } from "./content/blocks";
+import { Dock } from "./content/dock";
 import { clearPaint, type Hit, markCurrent, paint, rankHits } from "./content/hits";
 import { ScrollMarks } from "./content/marks";
-import { ResultsSidebar } from "./content/sidebar";
-import { SelectionPopover } from "./content/selection-popover";
+import { Peek } from "./content/peek";
+import { ScopeFrame } from "./content/scope-frame";
 import {
   type Excerpt,
   type ExcerptDraft,
@@ -15,6 +16,12 @@ import {
 import { type Progress, SEARCH_PORT, type Search, type SearchEvent, type TabMessage } from "./shared/protocol";
 import { MAX_CONDITIONS } from "./shared/questions";
 
+const THEME_ORDER: Theme[] = ["auto", "light", "dark"];
+interface UiPrefs {
+  theme: Theme;
+  showScope: boolean;
+}
+
 class Hunch {
   private readonly host = document.createElement("hunch-ui");
   private readonly shadow: ShadowRoot;
@@ -23,20 +30,22 @@ class Hunch {
     onChange: () => this.changed(),
     onStep: (dir) => this.step(dir),
     onClose: () => this.close(),
-    onPanel: () => this.setPanel(!this.panelOpen),
+    onSaved: () => this.setSaved(!this.peek.isSavedOpen),
+    onScopeVisible: () => this.setPrefs({ showScope: !this.prefs.showScope }),
+    onTheme: () =>
+      this.setPrefs({ theme: THEME_ORDER[(THEME_ORDER.indexOf(this.prefs.theme) + 1) % THEME_ORDER.length]! }),
   });
-  private readonly sidebar = new ResultsSidebar({
-    onPick: (hit) => this.goTo(hit),
+  private readonly scopeFrame = new ScopeFrame();
+  private prefs: UiPrefs = { theme: "auto", showScope: true };
+  private readonly peek = new Peek({
     onSave: (hit) => void this.save(hit),
     onCopyHit: (hit) => void this.copyHit(hit),
     onCopyExcerpt: (excerpt) => void this.copy(excerptsMarkdown([excerpt])),
     onDelete: (excerpt) => void this.deleteExcerpt(excerpt),
     onExport: () => this.export(),
-    onLoadSaved: () => void this.loadExcerpts(),
-    onClose: () => this.setPanel(false),
+    onCloseSaved: () => this.setSaved(false),
   });
   private readonly marks = new ScrollMarks((hit) => this.goTo(hit));
-  private selectionPopover!: SelectionPopover;
   private blocks: PageBlock[] = [];
   private ranges: Range[] = [];
   private hits: Hit[] = [];
@@ -44,7 +53,6 @@ class Hunch {
   private current: Hit | undefined;
   private request: Search | undefined;
   private port: browser.Runtime.Port | undefined;
-  private panelOpen = true;
 
   constructor() {
     const style = document.createElement("link");
@@ -52,14 +60,11 @@ class Hunch {
     style.href = browser.runtime.getURL("ui.css");
     // Saved excerpts from other pages must not be readable through the host page's DOM.
     this.shadow = this.host.attachShadow({ mode: "closed" });
-    this.shadow.append(style, this.bar.root, this.sidebar.root, this.marks.root);
-    this.selectionPopover = new SelectionPopover(this.shadow, this.host, {
-      onAsk: (question, ranges) => this.askSelection(question, ranges),
-    });
-    new ResizeObserver(() =>
-      this.host.style.setProperty("--hunch-bar-height", `${this.bar.root.getBoundingClientRect().height}px`),
-    ).observe(this.bar.root);
+    const dock = new Dock(this.peek.root, this.bar.root);
+    this.bar.root.prepend(dock.grabber);
+    this.shadow.append(style, this.scopeFrame.root, dock.root, this.marks.root);
     document.documentElement.appendChild(this.host);
+    void this.loadPrefs();
     window.addEventListener("resize", () => this.marks.draw(this.hits, this.current));
     document.addEventListener("selectionchange", () => {
       const ranges = captureSelection();
@@ -70,9 +75,9 @@ class Hunch {
           this.bar.set({
             verdict: { text: `已选中 ${characters} 个字符，可搜索当前选区。`, tone: "none" },
           });
+          this.paintScope();
         }
       }
-      this.selectionPopover.selectionChanged(ranges);
     });
   }
   get isOpen() {
@@ -82,22 +87,50 @@ class Hunch {
     const ranges = captureSelection();
     if (ranges.length) this.ranges = ranges;
     this.host.classList.add("hunch-open");
-    this.setPanel(true);
     this.changed();
     this.bar.focus();
     void this.loadExcerpts();
   }
   close() {
     this.host.classList.remove("hunch-open");
-    this.selectionPopover.hide();
+    this.scopeFrame.hide();
     this.abort();
+    this.setSaved(false);
     this.reset();
   }
-  private setPanel(open: boolean) {
-    this.panelOpen = open;
-    this.sidebar.root.hidden = !open;
-    this.host.classList.toggle("hunch-panel-open", open);
-    this.bar.setPanelOpen(open);
+  private async loadPrefs() {
+    try {
+      const stored = (await browser.storage?.local.get("ui")) as { ui?: Partial<UiPrefs> } | undefined;
+      const ui = stored?.ui;
+      this.applyPrefs({
+        theme: ui?.theme && THEME_ORDER.includes(ui.theme) ? ui.theme : "auto",
+        showScope: ui?.showScope !== false,
+      });
+    } catch {
+      this.applyPrefs(this.prefs);
+    }
+  }
+  private setPrefs(patch: Partial<UiPrefs>) {
+    this.applyPrefs({ ...this.prefs, ...patch });
+    void browser.storage?.local.set({ ui: this.prefs }).catch(() => {});
+  }
+  private applyPrefs(prefs: UiPrefs) {
+    this.prefs = prefs;
+    if (prefs.theme === "auto") delete this.host.dataset.theme;
+    else this.host.dataset.theme = prefs.theme;
+    this.bar.setTheme(prefs.theme);
+    this.bar.setScopeVisible(prefs.showScope);
+    this.paintScope();
+  }
+  // Outlines the search range for as long as the bottom bar is up.
+  private paintScope() {
+    if (this.isOpen && this.prefs.showScope) this.scopeFrame.show(this.bar.controls().scope, this.ranges);
+    else this.scopeFrame.hide();
+  }
+  private setSaved(open: boolean) {
+    this.peek.showSaved(open);
+    this.bar.setSavedOpen(open);
+    if (open) void this.loadExcerpts();
   }
   private reset() {
     clearPaint();
@@ -110,7 +143,7 @@ class Hunch {
       verdict: { text: "", tone: "none" },
       progress: { done: 0, total: 0 },
     });
-    this.sidebar.setResults([], undefined, [], "输入问题或条件，再点击搜索。摘录可以在“已存摘录”中查看。");
+    this.peek.showHit(undefined);
   }
   private changed() {
     this.abort();
@@ -118,12 +151,7 @@ class Hunch {
     const controls = this.bar.controls();
     this.blocks = extractBlocks(controls.scope, this.ranges);
     this.reset();
-  }
-  private askSelection(question: string, ranges: readonly Range[]) {
-    this.ranges = [...ranges];
-    this.bar.setQuestionForSelection(question);
-    this.open();
-    this.search();
+    this.paintScope();
   }
   private search() {
     if (!this.isOpen) return;
@@ -153,10 +181,8 @@ class Hunch {
       query: controls.mode === "conditions" ? controls.conditions.join("；") : controls.query,
     };
     this.request = req;
-    this.setPanel(true);
-    this.sidebar.showSaved(false);
+    this.setSaved(false);
     this.bar.set({ verdict: { text: "正在搜索…", tone: "busy" }, progress: { done: 0, total: 1 } });
-    this.sidebar.setResults([], undefined, req.conditions ?? [], "正在寻找符合条件的原文…");
     try {
       const port = browser.runtime.connect({ name: SEARCH_PORT });
       this.port = port;
@@ -181,7 +207,6 @@ class Hunch {
   }
   private error(message: string) {
     this.bar.set({ verdict: { text: message, tone: "error" }, progress: { done: 0, total: 0 } });
-    this.sidebar.tell(message);
   }
   private render(event: SearchEvent) {
     if (event.type === "failure") return this.error(event.message);
@@ -189,17 +214,7 @@ class Hunch {
     paint(this.hits);
     this.current = this.hits.find((hit) => hit.id === this.current?.id);
     const finished = event.done === event.total;
-    const empty = event.failed
-      ? "部分段落未完成搜索，结果可能不完整。请重试。"
-      : finished
-        ? "没有高相关结果。试试更具体的问题或调整筛选条件。"
-        : "正在搜索，结果会逐步显示。";
-    this.sidebar.setResults(
-      this.hits,
-      this.current,
-      this.request?.mode === "conditions" ? (this.request.conditions ?? []) : [],
-      empty,
-    );
+    if (this.current) this.peek.showHit(this.current, this.activeConditions());
     if (finished && !this.current && this.hits[0]) this.goTo(this.hits[0]);
     this.bar.set(this.status(event));
     this.marks.draw(this.hits, this.current);
@@ -221,7 +236,11 @@ class Hunch {
       counter: this.counterText(),
     } as const;
   }
+  private activeConditions() {
+    return this.request?.mode === "conditions" ? (this.request.conditions ?? []) : [];
+  }
   private counterText() {
+    if (!this.hits.length) return "";
     return this.current ? `${this.hits.indexOf(this.current) + 1} / ${this.hits.length}` : `${this.hits.length} 个结果`;
   }
   private step(dir: 1 | -1) {
@@ -230,11 +249,11 @@ class Hunch {
     this.goTo(this.hits[(index + dir + this.hits.length) % this.hits.length]!);
   }
   private goTo(hit: Hit) {
-    if (!hit.el.isConnected) return this.sidebar.tell("网页内容已变化，请重新搜索。");
+    if (!hit.el.isConnected) return this.bar.flash("网页内容已变化，请重新搜索。");
     markCurrent(this.current, hit);
     this.current = hit;
     this.bar.set({ counter: this.counterText() });
-    this.sidebar.setCurrent(hit);
+    this.peek.showHit(hit, this.activeConditions());
     this.marks.draw(this.hits, this.current);
   }
   private draft(hit: Hit): ExcerptDraft {
@@ -244,7 +263,7 @@ class Hunch {
       text: hit.text,
       heading: hit.heading,
       query: this.request?.query ?? "",
-      conditions: this.request?.mode === "conditions" ? (this.request.conditions ?? []) : [],
+      conditions: this.activeConditions(),
       combination: this.request?.combination ?? "all",
       scope: this.request?.scope ?? "page",
     };
@@ -253,29 +272,30 @@ class Hunch {
     const response = (await browser.runtime.sendMessage(message)) as ExcerptResponse;
     if (!response?.ok) throw new Error(response?.error ?? "无法读取本地摘录，请刷新网页后重试。");
     this.excerpts = response.excerpts;
-    this.sidebar.setExcerpts(this.excerpts);
+    this.peek.setExcerpts(this.excerpts);
+    this.bar.setSavedCount(this.excerpts.length);
   }
   private async loadExcerpts() {
     try {
       await this.excerptRequest({ type: "excerpt-list" });
     } catch (error) {
-      this.sidebar.tell(error instanceof Error ? error.message : String(error));
+      this.bar.flash(error instanceof Error ? error.message : String(error));
     }
   }
   private async save(hit: Hit) {
     try {
       await this.excerptRequest({ type: "excerpt-save", excerpt: this.draft(hit) });
-      this.sidebar.tell("已保存原文、标题、网址和搜索条件。");
+      this.bar.flash("已保存原文、标题、网址和搜索条件。");
     } catch (error) {
-      this.sidebar.tell(error instanceof Error ? error.message : String(error));
+      this.bar.flash(error instanceof Error ? error.message : String(error));
     }
   }
   private async deleteExcerpt(excerpt: Excerpt) {
     try {
       await this.excerptRequest({ type: "excerpt-delete", id: excerpt.id });
-      this.sidebar.tell("摘录已删除。");
+      this.bar.flash("摘录已删除。");
     } catch (error) {
-      this.sidebar.tell(error instanceof Error ? error.message : String(error));
+      this.bar.flash(error instanceof Error ? error.message : String(error));
     }
   }
   private async copyHit(hit: Hit) {
@@ -296,13 +316,13 @@ class Hunch {
         textarea.remove();
         if (!copied) throw new Error("复制失败，请使用导出 Markdown。");
       }
-      this.sidebar.tell("已复制原文与来源。");
+      this.bar.flash("已复制原文与来源。");
     } catch {
-      this.sidebar.tell("复制失败，请使用导出 Markdown。");
+      this.bar.flash("复制失败，请使用导出 Markdown。");
     }
   }
   private export() {
-    if (!this.excerpts.length) return this.sidebar.tell("还没有可导出的摘录。");
+    if (!this.excerpts.length) return this.bar.flash("还没有可导出的摘录。");
     const url = URL.createObjectURL(
       new Blob([excerptsMarkdown(this.excerpts)], { type: "text/markdown;charset=utf-8" }),
     );
@@ -313,7 +333,7 @@ class Hunch {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    this.sidebar.tell(`已导出 ${this.excerpts.length} 条摘录。`);
+    this.bar.flash(`已导出 ${this.excerpts.length} 条摘录。`);
   }
 }
 
