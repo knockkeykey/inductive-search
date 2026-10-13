@@ -1,14 +1,18 @@
 import browser from "webextension-polyfill";
 import { FindBar, type Theme } from "./content/bar";
 import { captureSelection, extractBlocks, type PageBlock } from "./content/blocks";
+import { CopyButton } from "./content/copy-button";
 import { Dock } from "./content/dock";
 import { clearPaint, type Hit, markCurrent, paint, rankHits } from "./content/hits";
 import { ScrollMarks } from "./content/marks";
 import { ScopeFrame } from "./content/scope-frame";
+import { clearSentences, paintSentences, sentenceRanges } from "./content/sentence-marks";
 import {
   type BlockId,
   blockId,
   type Progress,
+  type Refine,
+  type RefineResult,
   SEARCH_PORT,
   type Search,
   type SearchEvent,
@@ -16,8 +20,18 @@ import {
 } from "./shared/protocol";
 import { MAX_CONDITIONS } from "./shared/questions";
 import { keywordTerms, validThreshold } from "./shared/ranking";
+import {
+  pickSentences,
+  REFINE_TOP,
+  refinableSentences,
+  SENTENCE_THRESHOLD,
+  type Sentence,
+  type SentenceId,
+  validSentenceThreshold,
+} from "./shared/sentences";
 
 const THEME_ORDER: Theme[] = ["auto", "light", "dark"];
+const HEADING = /^H[1-6]$/;
 // Wait for a burst of DOM changes (infinite scroll, lazy sections) to settle before re-reading.
 const GROWTH_DEBOUNCE_MS = 800;
 // Chrome stops an idle service worker after ~30 s and cuts its ports; a port message resets that timer.
@@ -31,6 +45,14 @@ interface UiPrefs {
   theme: Theme;
   showScope: boolean;
   threshold: number;
+  // Second pass that scores sentences inside the top hits.
+  refine: boolean;
+  sentenceThreshold: number;
+}
+// Sentence scores for one hit; `scores` stays empty when the request failed.
+interface Refined {
+  sentences: Sentence[];
+  scores: Partial<Record<SentenceId, number>>;
 }
 
 class Hunch {
@@ -46,12 +68,26 @@ class Hunch {
     onThreshold: (threshold) => this.setPrefs({ threshold }),
     onRetry: () => this.retry(),
     onScopeVisible: () => this.setPrefs({ showScope: !this.prefs.showScope }),
-    onTheme: () =>
-      this.setPrefs({ theme: THEME_ORDER[(THEME_ORDER.indexOf(this.prefs.theme) + 1) % THEME_ORDER.length]! }),
+    onTheme: (theme) => this.setPrefs({ theme }),
+    onRefine: (refine) => this.setPrefs({ refine }),
+    onSentenceThreshold: (sentenceThreshold) => this.setPrefs({ sentenceThreshold }),
   });
   private readonly scopeFrame = new ScopeFrame();
-  private prefs: UiPrefs = { theme: "auto", showScope: true, threshold: validThreshold(undefined) };
+  private prefs: UiPrefs = {
+    theme: "auto",
+    showScope: true,
+    threshold: validThreshold(undefined),
+    refine: true,
+    sentenceThreshold: SENTENCE_THRESHOLD,
+  };
+  // Keyed by block id and text, since one element can hold several split blocks.
+  private refined = new Map<string, Refined | "pending">();
+  // Bumped whenever results are invalidated, so late sentence scores from an old search are dropped.
+  private generation = 0;
   private readonly marks = new ScrollMarks((hit) => this.goTo(hit));
+  private readonly copyButton = new CopyButton((ok) =>
+    this.bar.flash(ok ? "已复制段落。" : "复制失败，请手动选中文字复制。"),
+  );
   private blocks: PageBlock[] = [];
   private ranges: Range[] = [];
   private hits: Hit[] = [];
@@ -96,7 +132,9 @@ class Hunch {
     this.shadow = this.host.attachShadow({ mode: "closed" });
     const dock = new Dock(this.bar.root);
     this.bar.root.prepend(dock.grabber);
-    this.shadow.append(style, this.scopeFrame.root, dock.root, this.marks.root);
+    // After the bar in the DOM (and in tab order); CSS order places it above.
+    dock.root.append(this.bar.panel);
+    this.shadow.append(style, this.scopeFrame.root, this.copyButton.root, dock.root, this.marks.root);
     document.documentElement.appendChild(this.host);
     this.ready = Promise.all([styled, this.loadPrefs()]).then(() => {
       this.host.style.removeProperty("display");
@@ -127,6 +165,8 @@ class Hunch {
     if (this.isOpen) return;
     const ranges = captureSelection();
     if (ranges.length) this.ranges = ranges;
+    // The page may have switched its own theme since the last open.
+    this.applyTheme();
     this.host.classList.add("hunch-open");
     this.rescope();
     this.observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
@@ -148,6 +188,8 @@ class Hunch {
         theme: ui?.theme && THEME_ORDER.includes(ui.theme) ? ui.theme : "auto",
         showScope: ui?.showScope !== false,
         threshold: validThreshold(ui?.threshold),
+        refine: ui?.refine !== false,
+        sentenceThreshold: validSentenceThreshold(ui?.sentenceThreshold),
       });
     } catch {
       this.applyPrefs(this.prefs);
@@ -159,14 +201,21 @@ class Hunch {
   }
   private applyPrefs(prefs: UiPrefs) {
     const changed = this.prefs.threshold !== prefs.threshold;
+    const resentence = this.prefs.refine !== prefs.refine || this.prefs.sentenceThreshold !== prefs.sentenceThreshold;
     this.prefs = prefs;
-    if (prefs.theme === "auto") delete this.host.dataset.theme;
-    else this.host.dataset.theme = prefs.theme;
+    this.applyTheme();
     this.bar.setTheme(prefs.theme);
     this.bar.setScopeVisible(prefs.showScope);
     this.bar.setThreshold(prefs.threshold);
+    this.bar.setRefine(prefs.refine);
+    this.bar.setSentenceThreshold(prefs.sentenceThreshold);
     if (changed && this.request) this.rerank();
+    else if (resentence) this.refineTop();
     this.paintScope();
+  }
+  // 自动 follows the page, not the system: a dark site gets the dark bar even on a light Mac.
+  private applyTheme() {
+    this.host.dataset.theme = this.prefs.theme === "auto" ? pageTheme() : this.prefs.theme;
   }
   // Outlines the search range for as long as the bottom bar is up.
   private paintScope() {
@@ -175,6 +224,9 @@ class Hunch {
   }
   private reset() {
     clearPaint();
+    clearSentences();
+    this.refined.clear();
+    this.generation++;
     this.hits = [];
     this.current = undefined;
     this.scores = {};
@@ -185,6 +237,7 @@ class Hunch {
     this.setFailed([]);
     this.setPending([]);
     this.marks.draw([], undefined);
+    this.copyButton.update([], undefined);
     this.bar.set({
       counter: "",
       meta: `${this.blocks.length} 个文字块`,
@@ -353,12 +406,60 @@ class Hunch {
       terms: this.terms,
     });
     paint(this.hits, this.prefs.threshold);
+    this.refineTop();
     this.current = this.hits.find((hit) => hit.id === this.current?.id);
     // Wait for model scores before jumping: early keyword-only hits rank below model hits.
     if (!this.current && !this.searching && this.lastProgress && this.hits[0]) this.goTo(this.hits[0]);
     this.marks.draw(this.hits, this.current);
+    this.copyButton.update(this.hits, this.current);
     if (this.lastProgress) this.bar.set(this.status(this.lastProgress));
     else this.bar.set({ counter: this.counterText() });
+  }
+  // Scores sentences inside the top hits once their paragraph scores are final, then marks the best ones.
+  // Cached per block, so threshold changes only repaint; a hit new to the top 3 is scored then.
+  private refineTop() {
+    const req = this.request;
+    if (!req || !this.prefs.refine || req.mode === "conditions" || req.scope === "selection") {
+      return clearSentences();
+    }
+    const top = this.hits.filter((hit) => !HEADING.test(hit.el.tagName) && hit.p >= this.prefs.threshold);
+    const generation = this.generation;
+    for (const hit of top.slice(0, REFINE_TOP)) {
+      const key = `${hit.id}\u0000${hit.text}`;
+      if (this.refined.has(key) || !(hit.id in this.scores)) continue;
+      // Table rows join cells with " | "; their sentences don't map back to the row's text.
+      if (hit.el.matches("tr") || getComputedStyle(hit.el).display === "table-row") continue;
+      const sentences = refinableSentences(hit.text);
+      if (!sentences.length) continue;
+      this.refined.set(key, "pending");
+      const message: Refine = {
+        type: "refine",
+        url: req.url,
+        title: req.title,
+        query: req.query,
+        text: hit.text,
+        sentences: sentences.map(({ id, text }) => ({ id, text })),
+      };
+      Promise.resolve(browser.runtime.sendMessage(message) as Promise<RefineResult | undefined>)
+        .catch(() => undefined)
+        .then((result) => {
+          if (generation !== this.generation) return;
+          this.refined.set(key, { sentences, scores: result?.scores ?? {} });
+          this.paintRefined();
+        });
+    }
+    this.paintRefined();
+  }
+  private paintRefined() {
+    if (!this.prefs.refine) return clearSentences();
+    const ranges: Range[] = [];
+    for (const hit of this.hits.slice(0, REFINE_TOP * 2)) {
+      const entry = this.refined.get(`${hit.id}\u0000${hit.text}`);
+      if (!entry || entry === "pending") continue;
+      const picked = pickSentences(entry.sentences, entry.scores, this.prefs.sentenceThreshold);
+      ranges.push(...sentenceRanges(hit.el, hit.text, picked));
+    }
+    paintSentences(ranges);
   }
   private error(message: string) {
     // Blocks that already got a score are kept; only the rest are offered for retry.
@@ -415,7 +516,33 @@ class Hunch {
     this.current = hit;
     this.bar.set({ counter: this.counterText() });
     this.marks.draw(this.hits, this.current);
+    this.copyButton.update(this.hits, this.current);
   }
+}
+
+// Light or dark, judged from the page's own background (falling back to its text color).
+function pageTheme(): "light" | "dark" {
+  for (const el of [document.body, document.documentElement]) {
+    if (!el) continue;
+    const rgb = rgba(getComputedStyle(el).backgroundColor);
+    if (rgb && rgb[3] > 0.5) return luminance(rgb) < 0.4 ? "dark" : "light";
+  }
+  const text = document.body && rgba(getComputedStyle(document.body).color);
+  return text && luminance(text) > 0.6 ? "dark" : "light";
+}
+function rgba(color: string): [number, number, number, number] | undefined {
+  const m = color.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?/);
+  if (!m) return undefined;
+  const a = m[4] === undefined ? 1 : m[4].endsWith("%") ? Number.parseFloat(m[4]) / 100 : Number(m[4]);
+  return [Number(m[1]), Number(m[2]), Number(m[3]), a];
+}
+// Relative luminance (WCAG), 0 = black, 1 = white.
+function luminance([r, g, b]: readonly number[]) {
+  const lin = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!);
 }
 
 declare global {

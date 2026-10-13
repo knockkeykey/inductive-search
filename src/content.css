@@ -5,15 +5,16 @@
   initial-value: 0deg;
 }
 
-/* Page-scope highlights, modeled on Safari's Find on Page. */
+/* Page-scope highlights. Paragraphs get only a light warm wash, so the marked
+   sentences inside them (a saturated highlighter stroke) carry the emphasis. */
 .hunch-hl {
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own background */
-  background: rgba(255, 224, 102, var(--hunch-alpha, 0.3)) !important;
-  box-shadow: 0 0 0 3px rgba(255, 224, 102, var(--hunch-alpha, 0.3));
-  border-radius: 3px;
+  background: rgba(255, 196, 0, var(--hunch-alpha, 0.14)) !important;
+  box-shadow: 0 0 0 4px rgba(255, 196, 0, var(--hunch-alpha, 0.14));
+  border-radius: 4px;
   transition:
-    background 0.15s,
-    box-shadow 0.15s;
+    background 0.2s,
+    box-shadow 0.2s;
 }
 .hunch-hl.hunch-rel {
   position: relative;
@@ -34,23 +35,24 @@
   border-radius: 999px;
   pointer-events: none;
 }
+/* The current paragraph is set apart by a ring, not by a darker fill. */
 .hunch-hl.hunch-current {
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own background */
-  background: #ffd60a !important;
-  /* biome-ignore lint/complexity/noImportantStyles: like Safari, keep text readable on opaque yellow even on dark pages */
-  color: #1d1d1f !important;
+  background: rgba(255, 196, 0, 0.16) !important;
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own outline */
   outline: none !important;
   box-shadow:
-    0 0 0 3px #ffd60a,
-    0 2px 10px 3px rgba(0, 0, 0, 0.25);
-  animation: hunch-current-pop 0.15s ease-out;
+    0 0 0 4px rgba(255, 196, 0, 0.16),
+    0 0 0 5.5px rgba(230, 160, 0, 0.75),
+    0 4px 14px 4px rgba(0, 0, 0, 0.12);
+  animation: hunch-current-pop 0.18s ease-out;
 }
 @keyframes hunch-current-pop {
   50% {
     box-shadow:
-      0 0 0 7px #ffd60a,
-      0 4px 16px 7px rgba(0, 0, 0, 0.3);
+      0 0 0 7px rgba(255, 196, 0, 0.2),
+      0 0 0 8.5px rgba(230, 160, 0, 0.6),
+      0 6px 18px 6px rgba(0, 0, 0, 0.14);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -64,4 +66,15 @@
 /* Search range tint for 当前选区, visible but lighter than result highlights. */
 ::highlight(hunch-scope) {
   background-color: rgba(0, 122, 255, 0.22);
+}
+
+/* The best sentences inside a hit, drawn over the paragraph highlight (including the opaque current one). */
+/* Drawn in as a pen stroke by sentence-marks.ts; the tip is the ink right behind the pen. */
+::highlight(hunch-sentence) {
+  background-color: rgba(255, 212, 0, 0.92);
+  color: #1d1d1f;
+}
+::highlight(hunch-sentence-tip) {
+  background-color: rgba(255, 170, 0, 0.95);
+  color: #1d1d1f;
 }

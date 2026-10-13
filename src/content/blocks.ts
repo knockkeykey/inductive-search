@@ -190,3 +190,51 @@ function ownText(el: HTMLElement): string {
   collect(el);
   return normalize(text);
 }
+
+export interface TextPositions {
+  // Same string as the block's normalized own text.
+  text: string;
+  // DOM position of each character of `text`.
+  at: [Text, number][];
+}
+
+// Walks the same text nodes as ownText, in the same order, so offsets into a block's text
+// can be turned back into DOM Ranges. Whitespace is collapsed and trimmed exactly like normalize.
+export function textPositions(el: HTMLElement): TextPositions {
+  const nodes: Text[] = [];
+  const all = (root: Node) => {
+    const walker = (root.ownerDocument ?? document).createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+  };
+  const collect = (parent: HTMLElement) => {
+    for (const node of renderedChildren(parent)) {
+      if (node.nodeType === 3) nodes.push(node as Text);
+      else if (isHtml(node) && visible(node)) {
+        const display = computed(node).display;
+        if (display === "contents" || (display.startsWith("inline") && node.shadowRoot)) collect(node);
+        else if (display.startsWith("inline")) all(node);
+      }
+    }
+  };
+  collect(el);
+  let text = "";
+  const at: [Text, number][] = [];
+  let space = false;
+  for (const node of nodes) {
+    const data = node.data;
+    for (let i = 0; i < data.length; i++) {
+      if (/\s/.test(data[i]!)) {
+        if (space) continue;
+        space = true;
+        text += " ";
+      } else {
+        space = false;
+        text += data[i];
+      }
+      at.push([node, i]);
+    }
+  }
+  const lead = text.startsWith(" ") ? 1 : 0;
+  const trail = text.length > lead && text.endsWith(" ") ? 1 : 0;
+  return { text: text.slice(lead, text.length - trail), at: at.slice(lead, at.length - trail) };
+}

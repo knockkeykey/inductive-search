@@ -50,3 +50,17 @@ export interface Ping {
 export type TabMessage = Toggle | Ping;
 
 export const SEARCH_PORT = "hunch-search";
+
+// Second pass inside one hit: each sentence of the block gets its own score.
+export interface Refine {
+  type: "refine";
+  url: string;
+  title: string;
+  query: string;
+  text: string;
+  sentences: { id: `S${string}`; text: string }[];
+}
+// Empty when the request failed; the paragraph highlight stays as it is.
+export interface RefineResult {
+  scores: Record<`S${string}`, number>;
+}

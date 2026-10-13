@@ -1,6 +1,14 @@
 import type { NoulResponse } from "@typesafe-ai/sdk";
 import { createClient, PROVIDERS } from "../shared/api";
-import { type Block, type BlockId, type Progress, pageText, type Search } from "../shared/protocol";
+import {
+  type Block,
+  type BlockId,
+  type Progress,
+  pageText,
+  type Refine,
+  type RefineResult,
+  type Search,
+} from "../shared/protocol";
 import {
   combineConditions,
   conditionId,
@@ -10,6 +18,7 @@ import {
   MAX_CONCURRENT_REQUESTS,
   MAX_CONDITIONS,
   questionsFor,
+  sentenceQuestionsFor,
 } from "../shared/questions";
 import type { Settings } from "../shared/settings";
 
@@ -104,6 +113,39 @@ export async function answer(
   });
   if (!signal.aborted && failed === chunks.length) {
     throw firstError instanceof Error ? firstError : new Error("所有搜索请求均失败。");
+  }
+}
+
+// Scores each sentence of one hit. The whole paragraph is the page text, so a sentence is
+// judged with its neighbours as context. Any failure returns no scores: the paragraph result stands.
+export async function refine(req: Refine, settings: Settings, signal?: AbortSignal): Promise<RefineResult> {
+  if (!req.sentences.length) return { scores: {} };
+  try {
+    const client = createClient(settings);
+    const result = await client.systemOne(
+      {
+        state: {
+          url: req.url,
+          title: req.title,
+          page_text: req.sentences.map((s) => `${s.id}| ${s.text}`).join("\n"),
+        },
+        questions: sentenceQuestionsFor(
+          req.query,
+          req.sentences.map((s) => s.id),
+        ),
+      },
+      signal ? { signal } : undefined,
+    );
+    const scores: RefineResult["scores"] = {};
+    for (const { id } of req.sentences) {
+      const a = (result.answers as Record<string, NoulResponse> | undefined)?.[id];
+      if (a?.type !== "noul" || typeof a.noul !== "number" || !Number.isFinite(a.noul) || a.noul < 0 || a.noul > 1)
+        return { scores: {} };
+      scores[id] = a.noul;
+    }
+    return { scores };
+  } catch {
+    return { scores: {} };
   }
 }
 

@@ -1,9 +1,9 @@
 import browser from "webextension-polyfill";
-import { answer } from "./background/answer";
+import { answer, refine } from "./background/answer";
 import { PROVIDERS } from "./shared/api";
 import { documentKind, VIEWER_PAGE, viewerQuery } from "./shared/documents";
 import { hasContentScript, injectContentScript, sendToTab } from "./shared/inject";
-import { SEARCH_PORT, type Search, type SearchEvent } from "./shared/protocol";
+import { type Refine, type RefineResult, SEARCH_PORT, type Search, type SearchEvent } from "./shared/protocol";
 import { hasApiAccess, loadSettings } from "./shared/settings";
 
 async function toggle(tab: browser.Tabs.Tab) {
@@ -63,6 +63,16 @@ browser.action.onClicked.addListener(async (tab) => {
     console.error("感应式搜索 activation failed:", error);
     if (tab.id !== undefined) await unavailable(tab.id);
   }
+});
+
+// Sentence scores for one hit. Never throws: without them the paragraph highlight stays as it is.
+browser.runtime.onMessage.addListener((message: unknown): Promise<RefineResult> | undefined => {
+  if ((message as { type?: string })?.type !== "refine") return undefined;
+  return (async () => {
+    const settings = await loadSettings();
+    if (!settings.apiKey || !(await hasApiAccess(settings.provider))) return { scores: {} };
+    return refine(message as Refine, settings);
+  })().catch(() => ({ scores: {} }));
 });
 
 browser.runtime.onConnect.addListener((port) => {

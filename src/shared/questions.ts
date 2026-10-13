@@ -63,3 +63,13 @@ export function questionsFor(query: string, ids: readonly BlockId[]): Record<Blo
     });
   return Object.fromEntries(ids.map((id) => [id, block(id)]));
 }
+
+export function sentenceQuestionsFor(query: string, ids: readonly string[]): Record<string, NoulQuestion> {
+  const sentence = (id: string) =>
+    noul(`Within this paragraph, is sentence \`${id}\` the part a reader searching for "${query}" is looking for?`, {
+      true: "The sentence itself contains, states, or answers what the search is for; for a question, it gives the answer",
+      false:
+        "The sentence is only context around the answer, or merely shares a few words with the search without containing it",
+    });
+  return Object.fromEntries(ids.map((id) => [id, sentence(id)]));
+}

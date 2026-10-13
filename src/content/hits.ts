@@ -48,7 +48,7 @@ export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
 
     // Keyword-only hits sit below the threshold; give them the faintest highlight.
     const strength = Math.max(0, (p - threshold) / (1 - threshold));
-    el.style.setProperty("--hunch-alpha", (0.15 + 0.6 * strength).toFixed(2));
+    el.style.setProperty("--hunch-alpha", (0.08 + 0.14 * strength).toFixed(2));
     el.dataset.hunchP = p.toFixed(2);
   }
 }

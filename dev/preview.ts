@@ -1,5 +1,7 @@
+import { paintSentences } from "../src/content/sentence-marks";
 // Static style preview: renders the real bar with fake data, no extension APIs.
 import { FindBar } from "../src/content/bar";
+import { CopyButton } from "../src/content/copy-button";
 import { Dock } from "../src/content/dock";
 import type { Hit } from "../src/content/hits";
 import { ScopeFrame } from "../src/content/scope-frame";
@@ -24,19 +26,24 @@ const bar = new FindBar({
     else scopeFrame.hide();
   },
   onChange: () => scopeOn && scopeFrame.show(bar.controls().scope, []),
-  onTheme: () => {
-    const next = { auto: "light", light: "dark", dark: "auto" } as const;
-    const theme = next[(host.dataset.theme as "light" | "dark" | undefined) ?? "auto"];
+  onRefresh: noop,
+  onRetry: noop,
+  onScope: noop,
+  onThreshold: noop,
+  onRefine: (on) => bar.setRefine(on),
+  onSentenceThreshold: noop,
+  onTheme: (theme) => {
     if (theme === "auto") delete host.dataset.theme;
     else host.dataset.theme = theme;
     bar.setTheme(theme);
   },
 });
-const dock = new Dock(bar.root);
+const dock = new Dock(bar.root, bar.panel);
 bar.root.prepend(dock.grabber);
 const scopeFrame = new ScopeFrame();
 let scopeOn = true;
-shadow.append(style, scopeFrame.root, dock.root);
+const copyButton = new CopyButton((ok) => bar.flash(ok ? "已复制段落。" : "复制失败，请手动选中文字复制。"));
+shadow.append(style, scopeFrame.root, copyButton.root, dock.root);
 scopeFrame.show("page", []);
 
 const paragraphs = [...document.querySelectorAll<HTMLElement>("article p")];
@@ -89,6 +96,10 @@ const states: Record<string, () => void> = {
     scope.value = "article";
     scope.dispatchEvent(new Event("change"));
   },
+  settings() {
+    (bar.root.querySelector(".hunch-settings-toggle") as HTMLButtonElement).click();
+    (bar.panel.querySelector(".hunch-help-toggle") as HTMLButtonElement).click();
+  },
   dark() {
     host.dataset.theme = "dark";
     bar.setTheme("dark");
@@ -99,8 +110,25 @@ hits[0].el.classList.add("hunch-hl", "hunch-current");
 for (const hit of hits) {
   hit.el.classList.add("hunch-hl", "hunch-rel");
   hit.el.dataset.hunchP = hit.p.toFixed(2);
-  hit.el.style.setProperty("--hunch-alpha", String(hit.p * 0.6));
+  hit.el.style.setProperty("--hunch-alpha", String(0.08 + 0.14 * hit.p));
 }
+copyButton.update(hits, hits[0]);
+
+// Mark the answer sentence inside the first hit, as the second pass would.
+const first = hits[0].el.firstChild;
+if (first?.nodeType === 3 && globalThis.CSS?.highlights) {
+  const text = first.textContent ?? "";
+  const at = text.indexOf("那年冬天");
+  if (at >= 0) {
+    const range = document.createRange();
+    range.setStart(first, at);
+    range.setEnd(first, at + "那年冬天，祖母死了，父親的差使也交卸了，正是禍不單行的日子。".length);
+    paintSentences([range]);
+  }
+}
+bar.setRefine(true);
+bar.setSentenceThreshold(0.7);
+bar.setThreshold(0.4);
 
 const toolbar = document.getElementById("states")!;
 for (const name of Object.keys(states)) {

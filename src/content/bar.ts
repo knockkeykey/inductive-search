@@ -1,14 +1,15 @@
 import type { Combination, SearchMode, SearchScope } from "../shared/protocol";
 import { THRESHOLDS } from "../shared/ranking";
+import { SENTENCE_THRESHOLD_MAX, SENTENCE_THRESHOLD_MIN, SENTENCE_THRESHOLD_STEP } from "../shared/sentences";
 import { ConditionList } from "./condition-list";
 import { element } from "./element";
 import { icon } from "./icons";
 
 export type Theme = "auto" | "light" | "dark";
 const THEMES: Record<Theme, { icon: Parameters<typeof icon>[0]; label: string }> = {
-  auto: { icon: "circleHalf", label: "外观：跟随系统" },
-  light: { icon: "sun", label: "外观：浅色" },
-  dark: { icon: "moon", label: "外观：深色" },
+  auto: { icon: "circleHalf", label: "自动" },
+  light: { icon: "sun", label: "浅色" },
+  dark: { icon: "moon", label: "深色" },
 };
 
 export interface SearchControls {
@@ -26,8 +27,10 @@ export interface BarHandlers {
   onStep(dir: 1 | -1): void;
   onClose(): void;
   onScopeVisible(): void;
-  onTheme(): void;
+  onTheme(theme: Theme): void;
   onThreshold(value: number): void;
+  onRefine(on: boolean): void;
+  onSentenceThreshold(value: number): void;
   onRetry(): void;
 }
 export interface Status {
@@ -88,7 +91,6 @@ export class FindBar {
     },
     icon("viewfinder"),
   );
-  private readonly themeButton = element("button", { type: "button", class: "hunch-chip hunch-theme-toggle" });
   // Shown when the page grew after a search (infinite scroll, lazy sections).
   private readonly refreshButton = element(
     "button",
@@ -96,12 +98,6 @@ export class FindBar {
     icon("refresh"),
     element("span", { class: "hunch-chip-count" }, ""),
   );
-  // Re-ranks the scores already received; changing it never sends a request.
-  private readonly threshold = element("select", {
-    class: "hunch-chip-select",
-    "aria-label": "相关度阈值",
-    title: "相关度阈值：越低结果越多、越可能不相关。只重新排序，不重新请求。",
-  });
   // Shown when some batches failed; re-sends only the blocks that got no score.
   private readonly retryButton = element(
     "button",
@@ -109,6 +105,8 @@ export class FindBar {
     icon("refresh"),
     element("span", { class: "hunch-chip-count" }, ""),
   );
+  private readonly settings = new SettingsPanel();
+  readonly panel = this.settings.root;
   private verdictState: NonNullable<Status["verdict"]> = { text: "", tone: "none" };
   private flashTimer: number | undefined;
 
@@ -116,7 +114,6 @@ export class FindBar {
     this.conditions = new ConditionList({ onChange: handlers.onChange, onSubmit: handlers.onSubmit });
     this.scope.append(new Option("整页", "page"), new Option("仅正文", "article"), new Option("当前选区", "selection"));
     this.combination.append(new Option("全部满足", "all"), new Option("任一满足", "any"));
-    for (const value of THRESHOLDS) this.threshold.append(new Option(`阈值 ${value.toFixed(1)}`, String(value)));
     const submit = element(
       "button",
       { type: "button", class: "hunch-submit", title: "搜索 (Enter)", "aria-label": "搜索" },
@@ -149,24 +146,21 @@ export class FindBar {
         element("span", { class: "hunch-spacer" }),
         this.retryButton,
         this.refreshButton,
-        this.threshold,
-        this.themeButton,
+        this.settings.button,
       ),
       this.status,
       element("div", { class: "hunch-progress" }, this.progress),
     );
     this.paintMode();
-    this.setTheme("auto");
     this.set({ counter: "" });
     submit.addEventListener("click", handlers.onSubmit);
     close.addEventListener("click", handlers.onClose);
     prev.addEventListener("click", () => handlers.onStep(-1));
     next.addEventListener("click", () => handlers.onStep(1));
     this.scopeButton.addEventListener("click", handlers.onScopeVisible);
-    this.themeButton.addEventListener("click", handlers.onTheme);
     this.refreshButton.addEventListener("click", handlers.onRefresh);
     this.retryButton.addEventListener("click", handlers.onRetry);
-    this.threshold.addEventListener("change", () => handlers.onThreshold(Number(this.threshold.value)));
+    this.settings.listen(handlers);
     const pickMode = (value: SearchMode) => {
       if (value === this.modeValue) return;
       this.modeValue = value;
@@ -230,10 +224,13 @@ export class FindBar {
     this.scopeButton.setAttribute("aria-pressed", String(on));
   }
   setTheme(theme: Theme) {
-    const { icon: name, label } = THEMES[theme];
-    this.themeButton.replaceChildren(icon(name));
-    this.themeButton.title = `${label}（点击切换）`;
-    this.themeButton.setAttribute("aria-label", label);
+    this.settings.setTheme(theme);
+  }
+  setRefine(on: boolean) {
+    this.settings.setRefine(on);
+  }
+  setSentenceThreshold(value: number) {
+    this.settings.setSentenceThreshold(value);
   }
   // `count` new blocks appeared since the last search; 0 hides the chip.
   setPending(count: number) {
@@ -247,7 +244,7 @@ export class FindBar {
     this.retryButton.setAttribute("aria-label", `重新搜索失败的 ${count} 个文字块`);
   }
   setThreshold(value: number) {
-    this.threshold.value = String(value);
+    this.settings.setThreshold(value);
   }
   // Briefly replaces the status line with a confirmation, then restores the search verdict.
   flash(message: string) {
@@ -282,6 +279,180 @@ export class FindBar {
       const { done, total } = status.progress;
       this.progress.style.width = total ? `${Math.round((done / total) * 100)}%` : "0";
       this.progress.parentElement!.classList.toggle("hunch-active", total > 0 && done < total);
+    }
+  }
+}
+
+let uid = 0;
+
+// Settings that change how results are judged and shown. It opens above the bar, inside the dock,
+// so it moves with it. None of these settings sends a request on its own.
+class SettingsPanel {
+  readonly button = element(
+    "button",
+    {
+      type: "button",
+      class: "hunch-chip hunch-settings-toggle",
+      title: "设置",
+      "aria-label": "设置",
+      "aria-expanded": "false",
+      "aria-haspopup": "dialog",
+    },
+    icon("gear"),
+  );
+  private readonly threshold = element("select", { class: "hunch-chip-select", "aria-label": "相关度阈值" });
+  private readonly refine = element("input", { type: "checkbox", role: "switch", class: "hunch-switch" });
+  private readonly sentence = element("input", {
+    type: "range",
+    class: "hunch-range",
+    min: String(SENTENCE_THRESHOLD_MIN),
+    max: String(SENTENCE_THRESHOLD_MAX),
+    step: String(SENTENCE_THRESHOLD_STEP),
+    "aria-label": "句子阈值",
+  });
+  private readonly sentenceValue = element("output", { class: "hunch-range-value" });
+  private readonly themeButtons = (Object.keys(THEMES) as Theme[]).map((theme) =>
+    element(
+      "button",
+      { type: "button", role: "radio", "data-value": theme, "aria-label": `外观：${THEMES[theme].label}` },
+      icon(THEMES[theme].icon),
+      THEMES[theme].label,
+    ),
+  );
+  private readonly helpButton = iconButton("question", "判断标准说明", "hunch-help-toggle");
+  private readonly help: HTMLElement;
+  readonly root: HTMLElement;
+  private inside = false;
+
+  constructor() {
+    const id = `hunch-settings-${++uid}`;
+    for (const value of THRESHOLDS) this.threshold.append(new Option(value.toFixed(1), String(value)));
+    this.help = element(
+      "div",
+      { class: "hunch-help", id: `${id}-help`, hidden: "" },
+      element(
+        "ol",
+        {},
+        element("li", {}, "段落分是模型判断「这段是不是你要找的内容」的概率，0 到 1，越高越相关。"),
+        element(
+          "li",
+          {},
+          "只显示分数不低于段落阈值的段落，或包含全部关键词的段落。阈值越低，结果越多，也越可能不相关。",
+        ),
+        element(
+          "li",
+          {},
+          "段内精确定位会对前 3 条结果逐句再判断一次，分数不低于句子阈值的句子会加深标出，最多 2 句。不足 80 字或少于 3 句的段落、标题和表格不做。每条结果多一次请求。",
+        ),
+        element("li", {}, "调整阈值只重新筛选已有分数，不会重新请求。"),
+      ),
+    );
+    this.helpButton.setAttribute("aria-expanded", "false");
+    this.helpButton.setAttribute("aria-controls", this.help.id);
+    const row = (label: string, ...controls: Node[]) =>
+      element(
+        "label",
+        { class: "hunch-setting" },
+        element("span", { class: "hunch-setting-label" }, label),
+        ...controls,
+      );
+    this.root = element(
+      "div",
+      {
+        class: "hunch-settings hunch-material",
+        role: "dialog",
+        "aria-label": "设置",
+        id,
+        hidden: "",
+      },
+      element(
+        "div",
+        { class: "hunch-settings-head" },
+        element("span", { class: "hunch-settings-title" }, "设置"),
+        this.helpButton,
+      ),
+      this.help,
+      row("段落阈值", this.threshold),
+      row("段内精确定位", this.refine),
+      row("句子阈值", this.sentence, this.sentenceValue),
+      element(
+        "div",
+        { class: "hunch-setting" },
+        element("span", { class: "hunch-setting-label" }, "外观"),
+        element("div", { class: "hunch-segmented", role: "radiogroup", "aria-label": "外观" }, ...this.themeButtons),
+      ),
+    );
+    this.button.setAttribute("aria-controls", id);
+  }
+
+  listen(handlers: BarHandlers) {
+    this.button.addEventListener("click", () => this.toggle(this.root.hidden));
+    this.helpButton.addEventListener("click", () => {
+      const open = this.help.hidden;
+      this.help.hidden = !open;
+      this.helpButton.setAttribute("aria-expanded", String(open));
+    });
+    this.threshold.addEventListener("change", () => handlers.onThreshold(Number(this.threshold.value)));
+    this.refine.addEventListener("change", () => handlers.onRefine(this.refine.checked));
+    this.sentence.addEventListener("input", () => {
+      this.paintSentenceValue();
+      handlers.onSentenceThreshold(Number(this.sentence.value));
+    });
+    for (const button of this.themeButtons) {
+      button.addEventListener("click", () => handlers.onTheme(button.dataset.value as Theme));
+      button.addEventListener("keydown", (event) => {
+        const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        const i = this.themeButtons.indexOf(button);
+        const next = this.themeButtons[(i + step + this.themeButtons.length) % this.themeButtons.length]!;
+        handlers.onTheme(next.dataset.value as Theme);
+        next.focus();
+      });
+    }
+    this.root.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || event.isComposing) return;
+      event.stopPropagation();
+      this.toggle(false);
+    });
+    // Clicks inside the panel or on its button keep it open; any other click closes it.
+    const mark = () => {
+      this.inside = true;
+    };
+    this.root.addEventListener("pointerdown", mark);
+    this.button.addEventListener("pointerdown", mark);
+    window.addEventListener("pointerdown", () => {
+      if (!this.inside && !this.root.hidden) this.toggle(false, false);
+      this.inside = false;
+    });
+  }
+
+  private toggle(open: boolean, refocus = true) {
+    this.root.hidden = !open;
+    this.button.setAttribute("aria-expanded", String(open));
+    this.button.setAttribute("aria-pressed", String(open));
+    if (open) this.threshold.focus();
+    else if (refocus) this.button.focus();
+  }
+  private paintSentenceValue() {
+    this.sentenceValue.textContent = Number(this.sentence.value).toFixed(2);
+  }
+  setThreshold(value: number) {
+    this.threshold.value = String(value);
+  }
+  setRefine(on: boolean) {
+    this.refine.checked = on;
+    this.sentence.disabled = !on;
+  }
+  setSentenceThreshold(value: number) {
+    this.sentence.value = String(value);
+    this.paintSentenceValue();
+  }
+  setTheme(theme: Theme) {
+    for (const button of this.themeButtons) {
+      const on = button.dataset.value === theme;
+      button.setAttribute("aria-checked", String(on));
+      button.tabIndex = on ? 0 : -1;
     }
   }
 }
