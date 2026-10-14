@@ -276,8 +276,8 @@ textarea::placeholder {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--hunch-fill);
-  color: var(--hunch-secondary-label);
+  background: light-dark(rgba(var(--hunch-cond), 0.14), rgba(var(--hunch-cond-dark), 0.24));
+  color: light-dark(rgb(var(--hunch-cond)), rgb(var(--hunch-cond-dark)));
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -286,8 +286,29 @@ textarea::placeholder {
   content: counter(hunch-condition);
 }
 .hunch-condition-row:focus-within .hunch-condition-index {
-  background: var(--hunch-accent);
-  color: var(--hunch-on-accent);
+  background: light-dark(rgb(var(--hunch-cond)), rgb(var(--hunch-cond-dark)));
+  color: #fff;
+}
+/* Same hues as the page highlights in content.css, so each paragraph's tint names its condition. */
+.hunch-condition-row:nth-child(1) {
+  --hunch-cond: 0, 122, 255;
+  --hunch-cond-dark: 10, 132, 255;
+}
+.hunch-condition-row:nth-child(2) {
+  --hunch-cond: 36, 160, 70;
+  --hunch-cond-dark: 48, 209, 88;
+}
+.hunch-condition-row:nth-child(3) {
+  --hunch-cond: 230, 130, 0;
+  --hunch-cond-dark: 255, 159, 10;
+}
+.hunch-condition-row:nth-child(4) {
+  --hunch-cond: 175, 82, 222;
+  --hunch-cond-dark: 191, 90, 242;
+}
+.hunch-condition-row:nth-child(5) {
+  --hunch-cond: 255, 45, 85;
+  --hunch-cond-dark: 255, 55, 95;
 }
 .hunch-condition-input {
   flex: 1;
@@ -766,39 +787,6 @@ textarea::placeholder {
   top: 0;
   left: 0;
   opacity: 0;
-}
-
-/* Scrollbar hit marks */
-.hunch-marks {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 12px;
-}
-.hunch-mark {
-  pointer-events: auto;
-  position: absolute;
-  right: 2px;
-  width: 8px;
-  height: 3px;
-  border-radius: 2px;
-  background: light-dark(#ffcc00, #ffd60a);
-  box-shadow: 0 0 0 0.5px light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.5));
-  cursor: pointer;
-}
-.hunch-mark-current {
-  right: 1px;
-  width: 10px;
-  height: 5px;
-  background: light-dark(#ff9500, #ff9f0a);
-}
-.hunch-viewport {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  border-radius: 3px;
-  background: rgba(120, 120, 128, 0.18);
 }
 
 /* Settings panel: a card above the bar, inside the dock so it moves with it. */

@@ -140,7 +140,7 @@ async function openUrl(src: string) {
 async function blocked(url: URL, error: unknown) {
   if (url.protocol === "file:") {
     return say(
-      "无法读取本地文件。请在扩展管理页为感应式搜索打开“允许访问文件网址”，然后刷新本页；或者在下方选择这个文件。",
+      "无法读取本地文件。请在扩展管理页为感应式查找打开“允许访问文件网址”，然后刷新本页；或者在下方选择这个文件。",
       true,
     );
   }

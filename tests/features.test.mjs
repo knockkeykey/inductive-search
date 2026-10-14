@@ -164,6 +164,12 @@ test('find bar submits two-character queries, shows results only on the page and
   panel.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.ok(panel.hidden, 'Escape closes the settings panel');
   const input = shadow.querySelector('input');
+  const arrow = (target, key, extra = {}) => {
+    const event = new w.KeyboardEvent('keydown', { key, bubbles: true, composed: true, cancelable: true, ...extra });
+    target.dispatchEvent(event);
+    return event;
+  };
+  assert.equal(arrow(input, 'ArrowDown').defaultPrevented, false, 'no results leaves arrow keys alone');
   input.value = '退款'; input.dispatchEvent(new w.Event('input'));
   assert.equal(requests.length, 0, 'typing alone must not spend an API request');
   input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', isComposing: true }));
@@ -173,12 +179,67 @@ test('find bar submits two-character queries, shows results only on the page and
   assert.equal(requests[0].query, '退款');
   assert.ok(requests[0].blocks.every(block => !block.text.includes('Navigation') && !block.text.includes('Footer')));
   assert.ok(document.querySelector('.hunch-current'), 'the first result is highlighted on the page');
+  const counter = shadow.querySelector('.hunch-counter');
+  const total = Number(counter.textContent.split('/')[1].trim());
+  assert.ok(total > 1);
+  const firstHit = document.querySelector('.hunch-current');
+  input.focus();
+  assert.ok(arrow(input, 'ArrowDown').defaultPrevented, 'down navigates from the search input and prevents page scrolling');
+  assert.equal(counter.textContent, `2 / ${total}`, 'closed shadow root key events step exactly once');
+  assert.notEqual(document.querySelector('.hunch-current'), firstHit);
+  assert.equal(shadow.activeElement, input, 'navigation preserves input focus');
+  arrow(input, 'ArrowUp');
+  assert.equal(document.querySelector('.hunch-current'), firstHit);
+  assert.equal(counter.textContent, `1 / ${total}`);
+  assert.ok(arrow(input, 'Enter').defaultPrevented);
+  assert.equal(counter.textContent, `2 / ${total}`, 'Enter advances instead of repeating the search');
+  arrow(input, 'Enter', { shiftKey: true });
+  assert.equal(counter.textContent, `1 / ${total}`, 'Shift+Enter still goes backwards');
+  arrow(document.body, 'Enter');
+  assert.equal(counter.textContent, `2 / ${total}`, 'Enter works with focus on the page');
+  arrow(document.body, 'Enter', { shiftKey: true });
+  assert.equal(counter.textContent, `1 / ${total}`);
+  for (const extra of [{ isComposing: true }, { keyCode: 229 }]) {
+    assert.equal(arrow(input, 'Enter', extra).defaultPrevented, false);
+  }
+  for (const target of [shadow.querySelector('select'), shadow.querySelector('.hunch-submit')]) {
+    assert.equal(arrow(target, 'Enter').defaultPrevented, false, 'native Enter actions remain available');
+  }
+  assert.equal(requests.length, 1, 'Enter navigation and IME confirmation do not send requests');
+  document.body.focus();
+  assert.ok(arrow(document.body, 'ArrowUp').defaultPrevented);
+  assert.equal(counter.textContent, `${total} / ${total}`, 'up wraps to the last result');
+  arrow(document.body, 'ArrowDown');
+  assert.equal(counter.textContent, `1 / ${total}`, 'down wraps to the first result');
+  for (const extra of [{ isComposing: true }, { keyCode: 229 }, { altKey: true }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }]) {
+    assert.equal(arrow(input, 'ArrowDown', extra).defaultPrevented, false, 'IME and modified keys are preserved');
+  }
+  for (const target of [
+    shadow.querySelector('select'),
+    shadow.querySelector('.hunch-setting-child input'),
+    shadow.querySelector('.hunch-grabber'),
+    shadow.querySelector('.hunch-condition-input'),
+    document.querySelector('[contenteditable]'),
+  ]) {
+    arrow(target, 'ArrowDown');
+    assert.equal(counter.textContent, `1 / ${total}`, 'editing and control arrow keys do not navigate results');
+  }
+  const pageInput = document.createElement('input');
+  document.body.append(pageInput);
+  assert.equal(arrow(pageInput, 'ArrowDown').defaultPrevented, false);
+  pageInput.remove();
+  input.addEventListener('keydown', event => event.preventDefault(), { once: true });
+  arrow(input, 'ArrowDown');
+  assert.equal(counter.textContent, `1 / ${total}`, 'already handled keys are left alone');
+  assert.equal(requests.length, 1, 'result navigation never submits a new search');
   assert.ok(!shadow.querySelector('.hunch-sidebar, .hunch-peek'), 'results are not repeated in a card above the bar');
   assert.ok(!shadow.querySelector('[aria-label="已存摘录"], [aria-label="导出结果"]'), 'no excerpt or export controls');
   const scope = shadow.querySelector('[aria-label="搜索范围"]');
   scope.value = 'article'; scope.dispatchEvent(new w.Event('change'));
+  input.value = '新问题'; input.dispatchEvent(new w.Event('input'));
   input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter' }));
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests[1].query, '新问题', 'Enter submits the edited query after invalidating old results');
   assert.ok(requests[1].blocks.every(block => !block.text.includes('Navigation')));
   const selectedNode = document.querySelector('strong').firstChild;
   const range = document.createRange(); range.setStart(selectedNode, 0); range.setEnd(selectedNode, 8);
@@ -210,6 +271,7 @@ test('find bar submits two-character queries, shows results only on the page and
   await new Promise(resolve => setTimeout(resolve, 350));
   assert.equal(requests.length, 3, 'closing must not allow delayed searches');
   assert.ok(frame.hidden, 'the range outline goes away with the bar');
+  assert.equal(arrow(document.body, 'ArrowDown').defaultPrevented, false, 'closing restores normal page arrow keys');
   dom.window.close();
 });
 
@@ -247,6 +309,10 @@ test('extraction reads open shadow roots, slotted text and same-origin iframes i
   assert.equal(framed.heading, 'Frame heading');
   api.paint([{ ...framed, p: .9, conditionScores: [] }]);
   assert.ok(framed.el.classList.contains('hunch-hl'));
+  assert.equal(framed.el.dataset.hunchCond, undefined, 'semantic hits carry no condition hue');
+  api.paint([{ ...framed, p: .9, conditionScores: [.3, .9, .5] }]);
+  assert.equal(framed.el.dataset.hunchCond, '2', 'condition hits take the hue of their strongest condition');
+  assert.equal(framed.el.dataset.hunchP, '0.90', 'the combined score is unchanged');
   assert.ok(inner.head.querySelector('link[href$="content.css"]'), 'highlight styles are injected into the frame');
   api.clearPaint();
   assert.ok(!framed.el.classList.contains('hunch-hl'), 'clearing reaches highlights outside the top document');
@@ -391,7 +457,7 @@ test('a finished search closes its port, so a later worker shutdown is not repor
   assert.ok(!verdict().classList.contains('hunch-error'), 'a disconnect after the search finished is not an error');
   assert.ok(verdict().textContent.includes('找到'));
 
-  input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter' }));
+  shadow.querySelector('.hunch-submit').click();
   const second = ports[1];
   const [scored, ...rest] = second.req.blocks;
   second.receive({ type: 'progress', scores: { [scored.id]: .9 }, done: 1, total: 2, failed: 0, ms: 5 });

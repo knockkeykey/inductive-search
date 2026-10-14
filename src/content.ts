@@ -4,7 +4,6 @@ import { captureSelection, extractBlocks, type PageBlock } from "./content/block
 import { CopyButton } from "./content/copy-button";
 import { Dock } from "./content/dock";
 import { clearPaint, type Hit, markCurrent, paint, rankHits } from "./content/hits";
-import { ScrollMarks } from "./content/marks";
 import { ScopeFrame } from "./content/scope-frame";
 import { clearSentences, paintSentences, sentenceRanges } from "./content/sentence-marks";
 import { Spotlight } from "./content/spotlight";
@@ -97,7 +96,6 @@ class Hunch {
   private refined = new Map<string, Refined | "pending">();
   // Bumped whenever results are invalidated, so late sentence scores from an old search are dropped.
   private generation = 0;
-  private readonly marks = new ScrollMarks((hit) => this.goTo(hit));
   private readonly copyButton = new CopyButton((ok) =>
     this.bar.flash(ok ? "已复制段落。" : "复制失败，请手动选中文字复制。"),
   );
@@ -148,19 +146,16 @@ class Hunch {
     this.bar.root.prepend(dock.grabber);
     // After the bar in the DOM (and in tab order); CSS order places it above.
     dock.root.append(this.bar.panel);
-    this.shadow.append(
-      style,
-      this.spotlight.root,
-      this.scopeFrame.root,
-      this.copyButton.root,
-      dock.root,
-      this.marks.root,
-    );
+    this.shadow.append(style, this.spotlight.root, this.scopeFrame.root, this.copyButton.root, dock.root);
     document.documentElement.appendChild(this.host);
+    // Listen inside the closed shadow root before its targets are retargeted to the host.
+    this.shadow.addEventListener("keydown", (event) => this.navigateResults(event as KeyboardEvent));
+    document.addEventListener("keydown", (event) => {
+      if (event.target !== this.host) this.navigateResults(event);
+    });
     this.ready = Promise.all([styled, this.loadPrefs()]).then(() => {
       this.host.style.removeProperty("display");
     });
-    window.addEventListener("resize", () => this.marks.draw(this.hits, this.current));
     // Single-page apps change the URL without reloading; history events catch what mutations may miss.
     window.addEventListener("popstate", () => this.scheduleGrowthCheck());
     window.addEventListener("hashchange", () => this.scheduleGrowthCheck());
@@ -274,7 +269,6 @@ class Hunch {
     this.lastProgress = undefined;
     this.setFailed([]);
     this.setPending([]);
-    this.marks.draw([], undefined);
     this.copyButton.update([], undefined);
     this.bar.set({
       counter: "",
@@ -451,7 +445,6 @@ class Hunch {
     this.current = this.hits.find((hit) => hit.id === this.current?.id);
     // Wait for model scores before jumping: early keyword-only hits rank below model hits.
     if (!this.current && !this.searching && this.lastProgress && this.hits[0]) this.goTo(this.hits[0]);
-    this.marks.draw(this.hits, this.current);
     this.copyButton.update(this.hits, this.current);
     this.paintSpotlight();
     if (this.lastProgress) this.bar.set(this.status(this.lastProgress));
@@ -541,7 +534,11 @@ class Hunch {
     const text = !finished
       ? "正在搜索…"
       : progress.failed
-        ? `部分搜索失败，已找到 ${count} 段，可点“重试”`
+        ? `${
+            progress.failed === progress.total
+              ? `搜索失败${count ? `（以下 ${count} 段仅为字面匹配）` : ""}`
+              : `${progress.failed}/${progress.total} 批搜索失败，已找到 ${count} 段`
+          }：${(progress.error ?? "未知错误").replace(/[。.]$/, "")}。可点“重试”。`
         : count
           ? `找到 ${count} 段相关原文`
           : "没有高相关结果";
@@ -561,12 +558,46 @@ class Hunch {
     const index = this.current ? this.hits.indexOf(this.current) : dir === 1 ? -1 : 0;
     this.goTo(this.hits[(index + dir + this.hits.length) % this.hits.length]!);
   }
+  private navigateResults(event: KeyboardEvent) {
+    if (
+      !this.isOpen ||
+      !this.hits.length ||
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.keyCode === 229 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      (event.shiftKey && event.key !== "Enter") ||
+      (event.key !== "ArrowUp" && event.key !== "ArrowDown" && event.key !== "Enter")
+    )
+      return;
+    const path = event.composedPath().filter((node): node is HTMLElement => node instanceof HTMLElement);
+    const query = path[0];
+    const inQuery = query?.matches(".hunch-input") && this.bar.root.contains(query);
+    // Keep editing, native controls, settings and keyboard dock movement working as usual.
+    if (
+      path.some((node) => node.matches(".hunch-settings, .hunch-grabber")) ||
+      (event.key === "Enter" &&
+        path.some((node) => node.matches("button, a[href], summary, [role='button'], [role='link']"))) ||
+      (!inQuery &&
+        path.some(
+          (node) =>
+            node.matches(
+              "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='slider'], [role='spinbutton']",
+            ) || node.isContentEditable,
+        ))
+    )
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.step(event.key === "ArrowUp" || event.shiftKey ? -1 : 1);
+  }
   private goTo(hit: Hit) {
     if (!hit.el.isConnected) return this.bar.flash("网页内容已变化，请重新搜索。");
     markCurrent(this.current, hit);
     this.current = hit;
     this.bar.set({ counter: this.counterText() });
-    this.marks.draw(this.hits, this.current);
     this.copyButton.update(this.hits, this.current);
     this.paintSpotlight();
   }

@@ -68,11 +68,28 @@ export class Spotlight {
       top += box.top;
       view = frame.ownerDocument.defaultView;
     }
+    const box = clampToView(left - PAD, top - PAD, rect.width + PAD * 2, rect.height + PAD * 2);
     Object.assign(this.root.style, {
-      left: `${left - PAD}px`,
-      top: `${top - PAD}px`,
-      width: `${rect.width + PAD * 2}px`,
-      height: `${rect.height + PAD * 2}px`,
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: `${box.width}px`,
+      height: `${box.height}px`,
     });
   }
+}
+
+// How far past the window edge the cutout may extend. Only its edges near the window are ever seen.
+const SLACK = 40;
+
+// The dimming is a 200vmax spread around the cutout, so a cutout scrolled far off screen (or a very
+// tall paragraph) would leave the window undimmed. Clamping it to just past the window keeps the
+// spread over the whole window; once the paragraph is gone the cutout collapses past the near edge.
+function clampToView(left: number, top: number, width: number, height: number) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const x0 = Math.min(Math.max(left, -SLACK), vw + SLACK);
+  const x1 = Math.min(Math.max(left + width, -SLACK), vw + SLACK);
+  const y0 = Math.min(Math.max(top, -SLACK), vh + SLACK);
+  const y1 = Math.min(Math.max(top + height, -SLACK), vh + SLACK);
+  return { left: x0, top: y0, width: x1 - x0, height: y1 - y0 };
 }

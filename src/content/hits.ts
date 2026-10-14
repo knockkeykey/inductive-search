@@ -39,7 +39,7 @@ function ensureStyles(el: HTMLElement) {
 
 export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
   clearPaint();
-  for (const { el, p } of hits) {
+  for (const { el, p, conditionScores } of hits) {
     if (painted.has(el)) continue;
     painted.add(el);
     ensureStyles(el);
@@ -51,9 +51,20 @@ export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
     // Keyword-only hits sit below the threshold; give them the lightest wash. Still well below the
     // sentence marks' saturation so those carry the emphasis.
     const strength = Math.max(0, (p - threshold) / (1 - threshold));
-    el.style.setProperty("--hunch-alpha", (0.14 + 0.12 * strength).toFixed(3));
+    el.style.setProperty("--hunch-alpha", (0.2 + 0.4 * strength).toFixed(3));
     el.dataset.hunchP = p.toFixed(2);
+    // Condition mode: tint by the strongest condition, matching that condition's badge in the bar.
+    // Purely visual; the score and order above come from the combined p.
+    const cond = strongest(conditionScores);
+    if (cond >= 0) el.dataset.hunchCond = String(cond + 1);
   }
+}
+
+// Index of the highest score, or -1 when there are no per-condition scores (semantic mode).
+export function strongest(scores: readonly number[]): number {
+  let best = -1;
+  for (let i = 0; i < scores.length; i++) if (best < 0 || scores[i]! > scores[best]!) best = i;
+  return best;
 }
 
 export function clearPaint() {
@@ -62,6 +73,7 @@ export function clearPaint() {
     clearTone(el);
     el.style.removeProperty("--hunch-alpha");
     delete el.dataset.hunchP;
+    delete el.dataset.hunchCond;
   }
   painted.clear();
 }
@@ -70,17 +82,4 @@ export function markCurrent(prev: Hit | undefined, next: Hit | undefined, { scro
   prev?.el.classList.remove("hunch-current");
   next?.el.classList.add("hunch-current");
   if (scroll) next?.el.scrollIntoView({ block: "center", behavior: "smooth" });
-}
-
-// Position in the top document, adding the offsets of any same-origin frames on the way up.
-export function pageTop(el: HTMLElement): number {
-  let top = el.getBoundingClientRect().top;
-  let view = el.ownerDocument.defaultView;
-  while (view && view !== window) {
-    const frame = view.frameElement as HTMLElement | null;
-    if (!frame) break;
-    top += frame.getBoundingClientRect().top;
-    view = frame.ownerDocument.defaultView;
-  }
-  return top + window.scrollY;
 }

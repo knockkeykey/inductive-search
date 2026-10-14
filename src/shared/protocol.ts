@@ -32,6 +32,8 @@ export interface Progress {
   failed: number;
   ms: number;
   conditionScores?: Record<BlockId, number[]>;
+  // The first failed batch's error, worded for the user, whenever failed > 0.
+  error?: string;
 }
 
 export interface Failure {

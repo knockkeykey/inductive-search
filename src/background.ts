@@ -89,7 +89,7 @@ async function unavailable(tabId: number) {
   await browser.action.setBadgeText({ tabId, text: "n/a" });
   await browser.action.setTitle({
     tabId,
-    title: "感应式搜索无法在此页面运行：浏览器禁止扩展访问此页面",
+    title: "感应式查找无法在此页面运行：浏览器禁止扩展访问此页面",
   });
   setTimeout(() => void browser.action.setBadgeText({ tabId, text: "" }), 2500);
 }
@@ -102,7 +102,7 @@ browser.action.onClicked.addListener(async (tab) => {
   try {
     await toggle(tab);
   } catch (error) {
-    console.error("感应式搜索 activation failed:", error);
+    console.error("感应式查找 activation failed:", error);
     if (tab.id !== undefined) await unavailable(tab.id);
   }
 });
@@ -149,7 +149,7 @@ browser.runtime.onConnect.addListener((port) => {
         void browser.runtime.openOptionsPage();
         return emit({
           type: "failure",
-          message: `感应式搜索需要访问 ${PROVIDERS[settings.provider].name}。请在设置页面点击“保存”并允许访问，然后重试搜索。`,
+          message: `感应式查找需要访问 ${PROVIDERS[settings.provider].name}。请在设置页面点击“保存”并允许访问，然后重试搜索。`,
         });
       }
       await answer(req, settings, abort.signal, emit);

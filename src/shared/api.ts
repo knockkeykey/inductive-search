@@ -1,4 +1,4 @@
-import { TypeSafeClient } from "@typesafe-ai/sdk";
+import { APIConnectionError, APIError, APITimeoutError, TypeSafeClient } from "@typesafe-ai/sdk";
 
 export type Provider = "typesafe" | "openrouter" | "openlux";
 
@@ -42,6 +42,31 @@ export interface Settings {
 
 export function defaultSettings(provider: Provider = "typesafe"): Settings {
   return { provider, apiKey: "", model: PROVIDERS[provider].defaultModel };
+}
+
+const STATUS_HINTS: Record<number, string> = {
+  400: "请求被拒绝",
+  401: "API 密钥无效或已过期",
+  402: "账户余额或额度不足",
+  403: "无权访问该模型",
+  404: "模型或接口不存在，请检查模型名称",
+  408: "服务商处理超时",
+  413: "单批文字过长",
+  422: "请求参数校验失败",
+  429: "请求过于频繁或额度用尽",
+};
+
+// The provider's own words, plus status and request id, so a failure can be reported upstream as is.
+export function describeError(error: unknown, provider: Provider): string {
+  const name = PROVIDERS[provider].name;
+  if (error instanceof APIError) {
+    const hint = STATUS_HINTS[error.status] ?? (error.status >= 500 ? "服务商内部错误" : "请求失败");
+    const id = error.requestId ? `（请求 ID：${error.requestId}）` : "";
+    return `${name} 返回 HTTP ${error.status}：${hint}。原始信息：${error.message.replace(/^\d{3}\s+/, "")}${id}`;
+  }
+  if (error instanceof APITimeoutError) return `${name} 在 ${error.timeoutMs / 1000} 秒内没有返回结果（请求超时）。`;
+  if (error instanceof APIConnectionError) return `无法连接 ${name}：${error.message}`;
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function createClient(settings: Settings): TypeSafeClient {

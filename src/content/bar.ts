@@ -63,7 +63,7 @@ export class FindBar {
   });
   private readonly conditions: ConditionList;
   private readonly modeButtons = [
-    element("button", { type: "button", role: "radio", "data-value": "semantic" }, "按意思"),
+    element("button", { type: "button", role: "radio", "data-value": "semantic" }, "按问题"),
     element("button", { type: "button", role: "radio", "data-value": "conditions" }, "按条件"),
   ];
   private readonly mode = element(
@@ -117,18 +117,19 @@ export class FindBar {
     this.scope.append(new Option("整页", "page"), new Option("仅正文", "article"), new Option("当前选区", "selection"));
     this.scope.value = "article";
     this.combination.append(new Option("全部满足", "all"), new Option("任一满足", "any"));
+    this.combination.value = "any";
     const submit = element(
       "button",
       { type: "button", class: "hunch-submit", title: "搜索 (Enter)", "aria-label": "搜索" },
       icon("arrowUp"),
     );
-    const prev = iconButton("chevronUp", "上一个结果 (Shift+Enter)");
-    const next = iconButton("chevronDown", "下一个结果");
+    const prev = iconButton("chevronUp", "上一个结果 (↑ / Shift+Enter)");
+    const next = iconButton("chevronDown", "下一个结果 (↓ / Enter)");
     const close = iconButton("xmark", "关闭 (Esc)", "hunch-close");
     this.stepper = element("span", { class: "hunch-stepper" }, prev, this.counter, next);
     this.root = element(
       "div",
-      { class: "hunch-bar hunch-material", role: "search", "aria-label": "感应式搜索网页查找" },
+      { class: "hunch-bar hunch-material", role: "search", "aria-label": "感应式查找工具栏" },
       element(
         "div",
         { class: "hunch-command" },
@@ -193,6 +194,7 @@ export class FindBar {
       if (event.isComposing || event.keyCode === 229 || event.key !== "Enter") return;
       event.preventDefault();
       if (event.shiftKey) handlers.onStep(-1);
+      else if (!event.ctrlKey && !event.metaKey && !event.altKey && !this.stepper.hidden) handlers.onStep(1);
       else handlers.onSubmit();
     });
   }

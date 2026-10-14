@@ -193,6 +193,20 @@ test("authentication failure reaches the caller instead of becoming an absent an
   );
 });
 
+test("a failed batch reports the provider's status, message and request id", async () => {
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: { message: "Insufficient credits" } }), {
+      status: 402, headers: { "Content-Type": "application/json", "x-typesafe-request-id": "req_123" },
+    });
+  const progress = [];
+  await assert.rejects(
+    answer(search, { ...defaultSettings("openrouter"), apiKey: "router-test-key" }, new AbortController().signal, (p) => progress.push(p)),
+    /OpenRouter 返回 HTTP 402：账户余额或额度不足。原始信息：Insufficient credits（请求 ID：req_123）/,
+  );
+  assert.equal(progress.at(-1).failed, 1);
+  assert.match(progress.at(-1).error, /HTTP 402.*Insufficient credits/);
+});
+
 test("closing a search cancels the provider request without emitting more progress", async () => {
   const controller = new AbortController();
   globalThis.fetch = (_url, init) => new Promise((_resolve, reject) => {

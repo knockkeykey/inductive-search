@@ -1,5 +1,5 @@
 import type { NoulResponse } from "@typesafe-ai/sdk";
-import { createClient, PROVIDERS } from "../shared/api";
+import { createClient, describeError, PROVIDERS } from "../shared/api";
 import {
   type Block,
   type BlockId,
@@ -49,7 +49,7 @@ export async function answer(
   const conditionScores: Record<BlockId, number[]> = {};
   let done = 0;
   let failed = 0;
-  let firstError: unknown;
+  let firstError: string | undefined;
   const report = () =>
     emit({
       type: "progress",
@@ -59,6 +59,7 @@ export async function answer(
       failed,
       ms: Math.round(performance.now() - started),
       ...(conditions.length ? { conditionScores: { ...conditionScores } } : {}),
+      ...(firstError ? { error: firstError } : {}),
     });
 
   if (chunks.length === 0) return report();
@@ -106,14 +107,15 @@ export async function answer(
       Object.assign(conditionScores, chunkConditions);
     } catch (error) {
       if (signal.aborted) return;
-      firstError ??= error;
+      firstError ??= describeError(error, settings.provider);
+      console.error("感应式查找 search batch failed:", error);
       failed++;
     }
     done++;
     report();
   });
   if (!signal.aborted && failed === chunks.length) {
-    throw firstError instanceof Error ? firstError : new Error("所有搜索请求均失败。");
+    throw new Error(firstError ?? "所有搜索请求均失败。");
   }
 }
 

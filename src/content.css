@@ -5,12 +5,14 @@
   initial-value: 0deg;
 }
 
-/* Page-scope highlights, after Notes' highlighter and Safari's find-in-page. Paragraphs get a warm
-   wash, no border, so only the current one is ringed; the marked sentences inside them (a
-   saturated highlighter stroke) carry the emphasis. .hunch-dark (set per element by tone.ts) switches to the dark palette. */
+/* Page-scope highlights, after Safari's find-in-page. Paragraphs get a yellow wash that deepens
+   with the score, and the current one turns solid; the marked sentences inside them are inked in
+   dark (see the end of this file) so they stand out on either. .hunch-dark (set per element by
+   tone.ts) switches to the dark palette. */
 .hunch-hl {
-  --hunch-tint: 255, 204, 0;
-  --hunch-wash: rgba(var(--hunch-tint), var(--hunch-alpha, 0.18));
+  --hunch-tint: 255, 214, 10;
+  --hunch-wash: rgba(var(--hunch-tint), var(--hunch-alpha, 0.3));
+  --hunch-solid: rgb(var(--hunch-tint));
   --hunch-ring: rgba(214, 150, 0, 0.85);
   --hunch-lift: rgba(0, 0, 0, 0.1);
   --hunch-badge-bg: rgba(255, 255, 255, 0.78);
@@ -26,12 +28,57 @@
 }
 .hunch-hl.hunch-dark {
   --hunch-tint: 255, 214, 10;
-  --hunch-wash: rgba(var(--hunch-tint), calc(var(--hunch-alpha, 0.18) * 1.2));
+  --hunch-wash: rgba(var(--hunch-tint), calc(var(--hunch-alpha, 0.3) * 1.2));
   --hunch-ring: rgba(255, 214, 10, 0.8);
   --hunch-lift: rgba(0, 0, 0, 0.45);
   --hunch-badge-bg: rgba(44, 44, 46, 0.8);
   --hunch-badge-fg: rgba(255, 255, 255, 0.9);
   --hunch-badge-edge: rgba(255, 255, 255, 0.16);
+}
+/* Condition mode: one hue per condition, the same hues as the numbered badges in the bar (ui.css).
+   The solid current fill is lightened so dark text stays readable on blue or purple. */
+.hunch-hl[data-hunch-cond] {
+  --hunch-solid: color-mix(in srgb, rgb(var(--hunch-tint)) 45%, #fff);
+}
+.hunch-hl[data-hunch-cond="1"] {
+  --hunch-tint: 0, 122, 255;
+  --hunch-ring: rgba(0, 122, 255, 0.85);
+}
+.hunch-hl[data-hunch-cond="2"] {
+  --hunch-tint: 52, 199, 89;
+  --hunch-ring: rgba(36, 160, 70, 0.85);
+}
+.hunch-hl[data-hunch-cond="3"] {
+  --hunch-tint: 255, 149, 0;
+  --hunch-ring: rgba(214, 120, 0, 0.85);
+}
+.hunch-hl[data-hunch-cond="4"] {
+  --hunch-tint: 175, 82, 222;
+  --hunch-ring: rgba(175, 82, 222, 0.85);
+}
+.hunch-hl[data-hunch-cond="5"] {
+  --hunch-tint: 255, 45, 85;
+  --hunch-ring: rgba(255, 45, 85, 0.85);
+}
+.hunch-hl.hunch-dark[data-hunch-cond="1"] {
+  --hunch-tint: 10, 132, 255;
+  --hunch-ring: rgba(10, 132, 255, 0.85);
+}
+.hunch-hl.hunch-dark[data-hunch-cond="2"] {
+  --hunch-tint: 48, 209, 88;
+  --hunch-ring: rgba(48, 209, 88, 0.8);
+}
+.hunch-hl.hunch-dark[data-hunch-cond="3"] {
+  --hunch-tint: 255, 159, 10;
+  --hunch-ring: rgba(255, 159, 10, 0.8);
+}
+.hunch-hl.hunch-dark[data-hunch-cond="4"] {
+  --hunch-tint: 191, 90, 242;
+  --hunch-ring: rgba(191, 90, 242, 0.85);
+}
+.hunch-hl.hunch-dark[data-hunch-cond="5"] {
+  --hunch-tint: 255, 55, 95;
+  --hunch-ring: rgba(255, 55, 95, 0.85);
 }
 .hunch-hl.hunch-rel {
   position: relative;
@@ -68,10 +115,14 @@
 .hunch-hl.hunch-rel:hover::after {
   opacity: 1;
 }
-/* The current paragraph: a fine ring and a soft lift, popped in with a Safari find-style bounce.
+/* The current paragraph: an opaque fill like Safari's current match, a fine ring and a soft lift,
+   popped in with a Safari find-style bounce.
    The ring is an outline so it isn't seen through the translucent wash; the bounce animates only
    the outline offset and shadows, so the page element's layout is never touched. */
 .hunch-hl.hunch-current {
+  --hunch-wash: var(--hunch-solid);
+  /* biome-ignore lint/complexity/noImportantStyles: like Safari, keep text readable on the opaque fill even on dark pages */
+  color: #1d1d1f !important;
   /* biome-ignore lint/complexity/noImportantStyles: must win over the host page's own outline */
   outline: 1.5px solid var(--hunch-ring) !important;
   outline-offset: 4px;
@@ -121,12 +172,13 @@
 
 /* The best sentences inside a hit, drawn over the paragraph highlight (including the opaque current one). */
 /* Drawn in as a pen stroke by sentence-marks.ts; the tip is the ink right behind the pen. */
-/* Safari-style: saturated system yellow with dark text on light and dark pages alike. */
+/* Inverted ink: near-black with yellow text, so a sentence stands out on the yellow paragraph,
+   the solid current one, and light and dark pages alike. */
 ::highlight(hunch-sentence) {
-  background-color: rgba(255, 214, 10, 0.92);
-  color: #1d1d1f;
+  background-color: rgba(29, 29, 31, 0.9);
+  color: #ffd60a;
 }
 ::highlight(hunch-sentence-tip) {
-  background-color: rgba(255, 159, 10, 0.95);
+  background-color: #ff9f0a;
   color: #1d1d1f;
 }

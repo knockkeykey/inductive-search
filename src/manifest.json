@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "感应式搜索",
+  "name": "感应式查找",
   "version": "1.1.0",
-  "description": "按意思或按条件查找网页原文，并在网页上高亮结果。基于 Hunch。",
+  "description": "按问题或按条件查找网页原文，并在网页上高亮结果。基于 Hunch。",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -17,7 +17,7 @@
     "open_in_tab": true
   },
   "action": {
-    "default_title": "感应式搜索",
+    "default_title": "感应式查找",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

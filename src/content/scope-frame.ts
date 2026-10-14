@@ -66,12 +66,16 @@ export class ScopeFrame {
       this.root.hidden = true;
       return;
     }
-    // Outline the whole block, not just its visible slice: the frame stays pinned to the content
-    // and scrolls away with it instead of hugging the viewport edges.
+    // Keep vertical edges pinned to the whole block so they scroll away with the content.
+    // Horizontal edges are constrained in place() so full-width containers keep visible sides.
     this.place(rect.left - PAD, rect.top - PAD, rect.right + PAD, rect.bottom + PAD);
   }
 
   private place(left: number, top: number, right: number, bottom: number) {
+    // Exclude the scrollbar. Padding a full-width article otherwise puts both sides offscreen.
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    left = Math.max(0, left);
+    right = Math.min(viewportWidth, right);
     // Scrolled fully out of view: nothing to outline.
     this.root.hidden = right - left < 1 || bottom - top < 1 || bottom <= 0 || top >= window.innerHeight;
     if (this.root.hidden) return;
