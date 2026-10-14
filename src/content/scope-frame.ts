@@ -5,7 +5,6 @@ import { element } from "./element";
 const SCOPE_HIGHLIGHT = "hunch-scope";
 const LABELS: Record<SearchScope, string> = { page: "整页", article: "正文", selection: "选区" };
 const PAD = 6;
-const EDGE = 4;
 
 // A quiet outline of the region the next search will read: the whole viewport for 整页,
 // the detected article container for 正文, and the selected text for 选区.
@@ -67,17 +66,14 @@ export class ScopeFrame {
       this.root.hidden = true;
       return;
     }
-    this.place(
-      Math.max(rect.left - PAD, EDGE),
-      Math.max(rect.top - PAD, EDGE),
-      Math.min(rect.right + PAD, window.innerWidth - EDGE),
-      Math.min(rect.bottom + PAD, window.innerHeight - EDGE),
-    );
+    // Outline the whole block, not just its visible slice: the frame stays pinned to the content
+    // and scrolls away with it instead of hugging the viewport edges.
+    this.place(rect.left - PAD, rect.top - PAD, rect.right + PAD, rect.bottom + PAD);
   }
 
   private place(left: number, top: number, right: number, bottom: number) {
     // Scrolled fully out of view: nothing to outline.
-    this.root.hidden = right - left < 1 || bottom - top < 1;
+    this.root.hidden = right - left < 1 || bottom - top < 1 || bottom <= 0 || top >= window.innerHeight;
     if (this.root.hidden) return;
     // No room above for the label (selection labels sit fully above the box).
     this.root.classList.toggle("hunch-scope-tight", top < (this.scope === "selection" ? 24 : 12));

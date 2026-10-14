@@ -212,7 +212,7 @@ textarea::placeholder {
   padding: 0 6px 6px;
   border-radius: 20px;
   overflow: hidden;
-  animation: hunch-rise 0.35s var(--hunch-ease);
+  animation: hunch-enter 0.5s var(--hunch-ease);
   transition: box-shadow 0.2s;
 }
 .hunch-bar:has(.hunch-input:focus, .hunch-condition-input:focus) {
@@ -347,11 +347,14 @@ textarea::placeholder {
 .hunch-multiline .hunch-command > button {
   margin-top: 7px;
 }
+/* Tall hit strip that sits above the input's top edge, so the grab cursor wins there. */
 .hunch-grabber {
+  position: relative;
+  z-index: 1;
   display: flex;
   width: 100%;
-  height: 12px;
-  margin-bottom: -4px;
+  height: 20px;
+  margin-bottom: -10px;
   padding: 0;
   border-radius: 6px;
   background: transparent;
@@ -362,7 +365,7 @@ textarea::placeholder {
   content: "";
   width: 36px;
   height: 4px;
-  margin: 4px auto 0;
+  margin: 5px auto 0;
   border-radius: 2px;
   background: var(--hunch-tertiary-label);
   transition:
@@ -1058,6 +1061,16 @@ textarea::placeholder {
   from {
     opacity: 0;
     transform: translateY(12px) scale(0.98);
+  }
+}
+/* Bar entrance: slides up from below the viewport edge. */
+@keyframes hunch-enter {
+  from {
+    opacity: 0;
+    transform: translateY(calc(100% + 32px));
+  }
+  40% {
+    opacity: 1;
   }
 }
 @media (max-width: 700px) {
