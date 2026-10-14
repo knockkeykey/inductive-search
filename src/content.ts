@@ -455,7 +455,7 @@ class Hunch {
   // Cached per block, so threshold changes only repaint; a hit new to the top 3 is scored then.
   private refineTop() {
     const req = this.request;
-    if (!req || !this.prefs.refine || req.mode === "conditions" || req.scope === "selection") {
+    if (!req || !this.prefs.refine || req.scope === "selection") {
       return clearSentences();
     }
     const top = this.hits.filter((hit) => !HEADING.test(hit.el.tagName) && hit.p >= this.prefs.threshold);
@@ -477,6 +477,7 @@ class Hunch {
         url: req.url,
         title: req.title,
         query: req.query,
+        ...(req.mode === "conditions" ? { conditions: req.conditions, combination: req.combination ?? "all" } : {}),
         paragraphs: batch.map(({ hit, sentences }) => ({
           id: hit.id,
           sentences: sentences.map(({ id, text }) => ({ id, text })),

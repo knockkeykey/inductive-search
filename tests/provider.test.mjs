@@ -252,3 +252,26 @@ test("refine scores each paragraph in its own request, never showing it the othe
   assert.deepEqual(pages.sort(), ["S001| One.\nS002| Two.", "S001| Three."]);
   assert.deepEqual(result, { scores: { B001: { S001: 0.2, S002: 0.9 } } });
 });
+
+test("condition refine asks each sentence once per condition and combines like paragraph scores", async () => {
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    assert.deepEqual(Object.keys(body.questions).sort(), ["S001_C1", "S001_C2", "S002_C1", "S002_C2"]);
+    const answers = {
+      S001_C1: { type: "noul", noul: 0.9 },
+      S001_C2: { type: "noul", noul: 0.1 },
+      S002_C1: { type: "noul", noul: 0.6 },
+      S002_C2: { type: "noul", noul: 0.7 },
+    };
+    return json({ answers, model: "jev-1.13", usage: { input_tokens: 100, output_tokens: 1 } });
+  };
+  const paragraphs = [{ id: "B001", sentences: [{ id: "S001", text: "One." }, { id: "S002", text: "Two." }] }];
+  const settings = { ...defaultSettings(), apiKey: "official-test-key" };
+  for (const [combination, expected] of [["all", { S001: 0.1, S002: 0.6 }], ["any", { S001: 0.9, S002: 0.7 }]]) {
+    const result = await refine(
+      { type: "refine", url: search.url, title: search.title, query: "A；B", conditions: ["A", "B"], combination, paragraphs },
+      settings,
+    );
+    assert.deepEqual(result, { scores: { B001: expected } });
+  }
+});

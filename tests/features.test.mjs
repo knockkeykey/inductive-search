@@ -41,7 +41,9 @@ test('condition mode evaluates each condition and applies all/any without invent
   globalThis.fetch = async (_url, init) => {
     const body = JSON.parse(init.body);
     assert.deepEqual(Object.keys(body.questions), ['B001_C1', 'B001_C2']);
-    assert.equal(body.questions.B001_C1.instructions.condition, '有数据');
+    // Each condition is asked exactly like a 按问题 search for that text.
+    assert.deepEqual(body.questions.B001_C1, api.questionsFor('有数据', ['B001']).B001);
+    assert.deepEqual(body.questions.B001_C2, api.questionsFor('实测', ['B001']).B001);
     return json({ answers: { B001_C1: { type: 'noul', noul: .8 }, B001_C2: { type: 'noul', noul: .2 } } });
   };
   for (const [combination, expected] of [['all', .2], ['any', .8]]) {
@@ -62,10 +64,11 @@ test('condition requests respect the per-request question budget', async () => {
   };
   const blocks = Array.from({ length: 17 }, (_, i) => ({ id: `B${i}`, text: 'Evidence.' }));
   const progress = [];
-  await api.answer({ ...request, blocks, mode: 'conditions', conditions: ['A', 'B', 'C', 'D', 'E'] }, settings, new AbortController().signal, p => progress.push(p));
-  assert.equal(calls, 3);
+  await api.answer({ ...request, blocks, mode: 'conditions', conditions: ['A', 'B', 'C'] }, settings, new AbortController().signal, p => progress.push(p));
+  assert.equal(calls, 2);
   assert.equal(Object.keys(progress.at(-1).scores).length, 17);
-  await assert.rejects(api.answer({ ...request, mode: 'conditions', conditions: [] }, settings, new AbortController().signal, () => {}), /请输入 1 至 5 个条件/);
+  await assert.rejects(api.answer({ ...request, mode: 'conditions', conditions: [] }, settings, new AbortController().signal, () => {}), /请输入 1 至 3 个条件/);
+  await assert.rejects(api.answer({ ...request, mode: 'conditions', conditions: ['A', 'B', 'C', 'D'] }, settings, new AbortController().signal, () => {}), /请输入 1 至 3 个条件/);
 });
 
 // jsdom never fetches stylesheets; the widget waits for ui.css before it first opens.

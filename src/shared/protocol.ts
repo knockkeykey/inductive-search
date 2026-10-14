@@ -60,6 +60,9 @@ export interface Refine {
   url: string;
   title: string;
   query: string;
+  // Condition mode: each sentence is scored once per condition, combined like the paragraph scores.
+  conditions?: string[];
+  combination?: Combination;
   paragraphs: { id: BlockId; sentences: { id: `S${string}`; text: string }[] }[];
 }
 // Sentence scores per paragraph. A paragraph is missing when its answers were invalid

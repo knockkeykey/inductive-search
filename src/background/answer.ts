@@ -13,6 +13,7 @@ import {
   combineConditions,
   conditionId,
   conditionQuestions,
+  conditionSentenceQuestions,
   LARGE_CHUNK_CHARS,
   MAX_CHUNK_BLOCKS,
   MAX_CHUNK_CHARS,
@@ -126,9 +127,11 @@ export async function refine(req: Refine, settings: Settings, signal?: AbortSign
   const paragraphs = req.paragraphs.filter((p) => p.sentences.length);
   if (!paragraphs.length) return { scores: {} };
   const client = createClient(settings);
+  const conditions = req.conditions ?? [];
   const scores: RefineResult["scores"] = {};
   await Promise.all(
     paragraphs.map(async (p) => {
+      const ids = p.sentences.map((s) => s.id);
       try {
         const result = await client.systemOne(
           {
@@ -137,19 +140,30 @@ export async function refine(req: Refine, settings: Settings, signal?: AbortSign
               title: req.title,
               page_text: p.sentences.map((s) => `${s.id}| ${s.text}`).join("\n"),
             },
-            questions: sentenceQuestionsFor(
-              req.query,
-              p.sentences.map((s) => s.id),
-            ),
+            questions: conditions.length
+              ? conditionSentenceQuestions(conditions, ids)
+              : sentenceQuestionsFor(req.query, ids),
           },
           signal ? { signal } : undefined,
         );
+        const answers = result.answers as Record<string, NoulResponse> | undefined;
         const values: Record<`S${string}`, number> = {};
         for (const { id } of p.sentences) {
-          const a = (result.answers as Record<string, NoulResponse> | undefined)?.[id];
-          if (a?.type !== "noul" || typeof a.noul !== "number" || !Number.isFinite(a.noul) || a.noul < 0 || a.noul > 1)
-            return;
-          values[id] = a.noul;
+          const questionIds = conditions.length ? conditions.map((_, index) => conditionId(id, index)) : [id];
+          const sentence: number[] = [];
+          for (const questionId of questionIds) {
+            const a = answers?.[questionId];
+            if (
+              a?.type !== "noul" ||
+              typeof a.noul !== "number" ||
+              !Number.isFinite(a.noul) ||
+              a.noul < 0 ||
+              a.noul > 1
+            )
+              return;
+            sentence.push(a.noul);
+          }
+          values[id] = conditions.length ? combineConditions(sentence, req.combination ?? "all") : sentence[0]!;
         }
         scores[p.id] = values;
       } catch {}
