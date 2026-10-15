@@ -1,18 +1,56 @@
 :host {
   all: initial;
-  --hunch-bar-height: 104px;
+  /* Each pair is light-dark(); color-scheme (system, or forced by data-theme) picks the side.
+     Semantic colors modeled on Apple's label / fill / separator system colors. */
+  --hunch-label: light-dark(rgba(0, 0, 0, 0.88), rgba(255, 255, 255, 0.92));
+  --hunch-secondary-label: light-dark(rgba(60, 60, 67, 0.62), rgba(235, 235, 245, 0.6));
+  --hunch-tertiary-label: light-dark(rgba(60, 60, 67, 0.36), rgba(235, 235, 245, 0.32));
+  --hunch-separator: light-dark(rgba(60, 60, 67, 0.16), rgba(84, 84, 88, 0.6));
+  --hunch-fill: light-dark(rgba(120, 120, 128, 0.12), rgba(120, 120, 128, 0.24));
+  --hunch-fill-hover: light-dark(rgba(120, 120, 128, 0.2), rgba(120, 120, 128, 0.34));
+  --hunch-control: light-dark(#fff, rgba(255, 255, 255, 0.06));
+  --hunch-material: light-dark(rgba(246, 246, 246, 0.8), rgba(30, 30, 32, 0.8));
+  --hunch-material-solid: light-dark(rgba(246, 246, 246, 0.96), rgba(30, 30, 32, 0.96));
+  --hunch-grouped: light-dark(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.05));
+  --hunch-edge: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.12));
+  --hunch-highlight-edge: light-dark(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.08));
+  --hunch-accent: light-dark(#007aff, #0a84ff);
+  --hunch-accent-hover: light-dark(#0068d9, #409cff);
+  --hunch-accent-tint: light-dark(rgba(0, 122, 255, 0.12), rgba(10, 132, 255, 0.22));
+  --hunch-accent-text: light-dark(#0066d6, #5eb0ff);
+  --hunch-on-accent: #fff;
+  --hunch-green: light-dark(#248a3d, #30d158);
+  --hunch-red: light-dark(#d70015, #ff453a);
+  --hunch-orange: light-dark(#c93400, #ff9f0a);
+  --hunch-orange-tint: light-dark(rgba(255, 149, 0, 0.14), rgba(255, 159, 10, 0.16));
+  --hunch-focus: light-dark(rgba(0, 122, 255, 0.45), rgba(10, 132, 255, 0.6));
+  --hunch-shadow:
+    0 0 0 0.5px var(--hunch-edge), 0 10px 40px light-dark(rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.5)),
+    0 2px 8px light-dark(rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.3));
+  --hunch-ease: cubic-bezier(0.32, 0.72, 0, 1);
   position: fixed;
   inset: 0;
   z-index: 2147483647;
   pointer-events: none;
   display: none;
   font:
-    14px / 1.5 -apple-system,
+    13px / 1.45 -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
+    "SF Pro Text",
     "PingFang SC",
+    "Hiragino Sans GB",
+    "Segoe UI",
+    "Microsoft YaHei",
     sans-serif;
-  color: #fbfbfe;
+  letter-spacing: -0.003em;
+  color: var(--hunch-label);
+  color-scheme: light dark;
+  -webkit-font-smoothing: antialiased;
+}
+:host([data-theme="light"]) {
+  color-scheme: light;
+}
+:host([data-theme="dark"]) {
   color-scheme: dark;
 }
 :host(.hunch-open) {
@@ -25,349 +63,1020 @@
   /* biome-ignore lint/complexity/noImportantStyles: preserve hidden behavior after component display rules */
   display: none !important;
 }
+
+/* Materials: translucent vibrancy, with a solid fallback when blur is unavailable or unwanted. */
+.hunch-material {
+  background: var(--hunch-material-solid);
+  box-shadow:
+    inset 0 0.5px 0 var(--hunch-highlight-edge),
+    var(--hunch-shadow);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .hunch-material {
+    background: var(--hunch-material);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(30px) saturate(180%);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .hunch-material {
+    background: var(--hunch-material-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Base controls */
 button,
 input,
 select,
 textarea {
   font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  margin: 0;
 }
 button,
 select {
-  cursor: pointer;
+  cursor: default;
 }
 button {
-  border: 1px solid #52525e;
-  border-radius: 5px;
-  background: #2b2a33;
-  color: #fbfbfe;
-  padding: 5px 9px;
-  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--hunch-fill);
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    transform 0.1s,
+    opacity 0.15s;
 }
 button:hover {
-  background: #3a3944;
+  background: var(--hunch-fill-hover);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 button:disabled {
-  opacity: 0.55;
-  cursor: default;
+  opacity: 0.4;
 }
 button:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 2px solid #fbbf24;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--hunch-focus);
+}
+.hunch-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hunch-icon-button {
+  width: 28px;
+  padding: 0;
+  background: transparent;
+  color: var(--hunch-secondary-label);
+}
+.hunch-icon-button:hover {
+  color: var(--hunch-label);
 }
 input,
-select,
 textarea {
   min-width: 0;
-  border: 1px solid #52525e;
-  border-radius: 5px;
-  background: #2b2a33;
-  color: #fbfbfe;
-  padding: 7px 10px;
-  margin: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
 }
-input:focus,
-textarea:focus {
-  border-color: #fbbf24;
-  outline: 1px solid #fbbf24;
+input::placeholder,
+textarea::placeholder {
+  color: var(--hunch-tertiary-label);
+}
+/* Segmented control for the search mode */
+.hunch-segmented {
+  flex: none;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--hunch-fill);
+}
+.hunch-segmented button {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hunch-secondary-label);
+  font-size: 12px;
+  font-weight: 500;
+}
+.hunch-segmented button:hover {
+  background: transparent;
+  color: var(--hunch-label);
+}
+.hunch-segmented [aria-checked="true"] {
+  background: light-dark(var(--hunch-control), rgba(255, 255, 255, 0.18));
+  color: var(--hunch-label);
+  box-shadow:
+    0 0 0 0.5px var(--hunch-edge),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Floating dock: a Spotlight-style command bar */
+.hunch-dock {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .hunch-bar {
   pointer-events: auto;
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 12px 18px calc(10px + env(safe-area-inset-bottom, 0px));
-  background: #1c1b22;
-  border-top: 1px solid #52525e;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
 }
-.hunch-controls {
+.hunch-bar {
+  position: relative;
+  padding: 0 6px 6px;
+  border-radius: 20px;
+  overflow: hidden;
+  animation: hunch-enter 0.5s var(--hunch-ease);
+  transition: box-shadow 0.2s;
+}
+.hunch-bar:has(.hunch-input:focus, .hunch-condition-input:focus) {
+  box-shadow:
+    inset 0 0.5px 0 var(--hunch-highlight-edge),
+    0 0 0 3px var(--hunch-accent-tint),
+    var(--hunch-shadow);
+}
+.hunch-command {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-height: 46px;
+  padding-left: 10px;
+}
+.hunch-field-icon {
+  display: inline-flex;
+  color: var(--hunch-secondary-label);
+}
+.hunch-field-icon .hunch-icon {
+  width: 18px;
+  height: 18px;
 }
 .hunch-input {
   flex: 1;
+  height: 46px;
+  padding: 0 4px;
+  font-size: 16px;
 }
-.hunch-conditions {
-  display: block;
-  resize: vertical;
-  width: 100%;
-  max-height: 220px;
-  margin-top: 9px;
+.hunch-condition-list {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0 2px;
 }
-.hunch-submit {
-  background: #fbbf24;
-  border-color: #fbbf24;
-  color: #1c1b22;
-  font-weight: 650;
-  padding: 7px 17px;
+.hunch-condition-rows {
+  max-height: 200px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  list-style: none;
+  counter-reset: hunch-condition;
 }
-.hunch-submit:hover {
-  background: #fcd66b;
-}
-.hunch-close {
-  border: 0;
-  background: transparent;
-  color: #a8a7b3;
-  font-size: 17px;
-}
-.hunch-status {
+.hunch-condition-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 12px;
+  gap: 10px;
+  height: 38px;
+  padding-right: 2px;
+  counter-increment: hunch-condition;
 }
-.hunch-counter {
-  min-width: 72px;
+.hunch-condition-row + .hunch-condition-row {
+  border-top: 0.5px solid var(--hunch-separator);
+}
+.hunch-condition-index {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: light-dark(rgba(var(--hunch-cond), 0.14), rgba(var(--hunch-cond-dark), 0.24));
+  color: light-dark(rgb(var(--hunch-cond)), rgb(var(--hunch-cond-dark)));
+  font-size: 11px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.hunch-nav {
-  white-space: nowrap;
+.hunch-condition-index::before {
+  content: counter(hunch-condition);
 }
-.hunch-status .hunch-nav {
-  padding: 2px 7px;
+.hunch-condition-row:focus-within .hunch-condition-index {
+  background: light-dark(rgb(var(--hunch-cond)), rgb(var(--hunch-cond-dark)));
+  color: #fff;
+}
+/* Same hues as the page highlights in content.css, so each paragraph's tint names its condition. */
+.hunch-condition-row:nth-child(1) {
+  --hunch-cond: 0, 122, 255;
+  --hunch-cond-dark: 10, 132, 255;
+}
+.hunch-condition-row:nth-child(2) {
+  --hunch-cond: 36, 160, 70;
+  --hunch-cond-dark: 48, 209, 88;
+}
+.hunch-condition-row:nth-child(3) {
+  --hunch-cond: 230, 130, 0;
+  --hunch-cond-dark: 255, 159, 10;
+}
+.hunch-condition-row:nth-child(4) {
+  --hunch-cond: 175, 82, 222;
+  --hunch-cond-dark: 191, 90, 242;
+}
+.hunch-condition-row:nth-child(5) {
+  --hunch-cond: 255, 45, 85;
+  --hunch-cond-dark: 255, 55, 95;
+}
+.hunch-condition-input {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  font-size: 15px;
+}
+.hunch-condition-remove {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  opacity: 0;
+}
+.hunch-condition-remove .hunch-icon {
+  width: 13px;
+  height: 13px;
+}
+.hunch-condition-row:hover .hunch-condition-remove,
+.hunch-condition-row:focus-within .hunch-condition-remove,
+.hunch-condition-remove:focus-visible {
+  opacity: 1;
+}
+.hunch-condition-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+}
+.hunch-add-condition {
+  height: 26px;
+  margin-left: -6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hunch-accent-text);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.hunch-add-condition:hover {
+  background: var(--hunch-accent-tint);
+}
+.hunch-add-condition .hunch-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.8;
+}
+.hunch-condition-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--hunch-tertiary-label);
+}
+.hunch-multiline .hunch-command {
+  align-items: flex-start;
+  padding-left: 12px;
+}
+.hunch-multiline .hunch-command > button {
+  margin-top: 7px;
+}
+/* Tall hit strip that sits above the input's top edge, so the grab cursor wins there. */
+.hunch-grabber {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 20px;
+  margin-bottom: -10px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+.hunch-grabber::before {
+  content: "";
+  width: 36px;
+  height: 4px;
+  margin: 5px auto 0;
+  border-radius: 2px;
+  background: var(--hunch-tertiary-label);
+  transition:
+    background 0.15s,
+    width 0.2s var(--hunch-ease);
+}
+.hunch-grabber:hover {
+  background: transparent;
+}
+.hunch-grabber:hover::before,
+.hunch-dragging .hunch-grabber::before {
+  width: 44px;
+  background: var(--hunch-secondary-label);
+}
+.hunch-grabber:active:not(:disabled) {
+  transform: none;
+}
+.hunch-dragging,
+.hunch-dragging .hunch-grabber {
+  cursor: grabbing;
+  user-select: none;
+}
+.hunch-dragging .hunch-bar {
+  box-shadow:
+    inset 0 0.5px 0 var(--hunch-highlight-edge),
+    0 0 0 0.5px var(--hunch-edge),
+    0 18px 56px rgba(0, 0, 0, 0.24),
+    0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.hunch-stepper {
+  flex: none;
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 2px;
+  border-radius: 999px;
+  background: var(--hunch-fill);
+}
+.hunch-stepper .hunch-icon-button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+.hunch-counter {
+  min-width: 36px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--hunch-label);
+  font-variant-numeric: tabular-nums;
+}
+.hunch-submit {
+  flex: none;
+  background: var(--hunch-accent);
+  color: var(--hunch-on-accent);
+  font-weight: 600;
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.25);
+}
+.hunch-submit {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+}
+.hunch-submit .hunch-icon {
+  stroke-width: 2;
+}
+.hunch-submit:hover {
+  background: var(--hunch-accent-hover);
+}
+.hunch-close {
+  border-radius: 50%;
+}
+.hunch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin: 0 -6px -6px;
+  padding: 5px 8px;
+  border-top: 0.5px solid var(--hunch-separator);
+  font-size: 12px;
+  color: var(--hunch-secondary-label);
+}
+.hunch-chip-select {
+  appearance: none;
+  height: 26px;
+  padding: 0 24px 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background:
+    var(--hunch-fill)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%238e8e93' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 8 10 4.5 13.5 8M6.5 12l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E")
+    no-repeat right 7px center / 12px;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+}
+.hunch-chip-select:hover {
+  background-color: var(--hunch-fill-hover);
+}
+.hunch-chip {
+  flex: none;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hunch-secondary-label);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.hunch-chip .hunch-icon {
+  width: 14px;
+  height: 14px;
+}
+.hunch-chip[aria-pressed="true"] {
+  background: var(--hunch-accent-tint);
+  color: var(--hunch-accent-text);
+}
+.hunch-chip[aria-pressed="true"] .hunch-icon {
+  fill: currentColor;
+}
+/* Outline-only icons stay hollow when their toggle is on. */
+.hunch-scope-toggle[aria-pressed="true"] .hunch-icon {
+  fill: none;
+}
+.hunch-theme-toggle {
+  width: 26px;
+  padding: 0;
+}
+.hunch-theme-toggle:hover,
+.hunch-scope-toggle[aria-pressed="false"]:hover {
+  color: var(--hunch-label);
+}
+.hunch-settings-toggle {
+  margin-left: auto;
+}
+/* Toolbar status: long messages wrap within the space between the controls. */
+.hunch-status {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 0 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--hunch-secondary-label);
+  user-select: text;
+  cursor: text;
 }
 .hunch-verdict {
-  font-weight: 550;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .hunch-found {
-  color: #73ddb8;
+  color: var(--hunch-green);
 }
-.hunch-absent,
+.hunch-absent {
+  color: var(--hunch-secondary-label);
+}
 .hunch-error {
-  color: #ff9aa2;
+  color: var(--hunch-red);
 }
 .hunch-busy {
-  color: #80bfff;
+  color: var(--hunch-accent);
 }
 .hunch-meta {
-  color: #a8a7b3;
-  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--hunch-tertiary-label);
   font-variant-numeric: tabular-nums;
 }
 .hunch-progress {
   position: absolute;
   left: 0;
   right: 0;
-  top: -2px;
+  bottom: 0;
   height: 2px;
 }
 .hunch-progress-fill {
   width: 0;
   height: 100%;
-  background: #80bfff;
+  background: var(--hunch-accent);
+  border-radius: 0 1px 1px 0;
   opacity: 0;
-  transition: width 0.15s;
+  transition:
+    width 0.25s var(--hunch-ease),
+    opacity 0.3s;
 }
 .hunch-progress.hunch-active .hunch-progress-fill {
   opacity: 1;
 }
-.hunch-sidebar {
-  pointer-events: auto;
-  position: absolute;
-  top: 18px;
-  right: 22px;
-  bottom: calc(var(--hunch-bar-height) + 16px);
-  width: 390px;
-  display: flex;
-  flex-direction: column;
-  background: #1c1b22;
-  border: 1px solid #52525e;
-  border-radius: 9px;
-  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.28);
-  overflow: hidden;
+
+/* Search range outline: a thin Apple Intelligence-style flowing rainbow line. Never intercepts the page. */
+.hunch-scope {
+  --hunch-scope-ring: 1.5px;
+  --hunch-scope-glow: 3px;
+  --hunch-scope-colors: #ff5c8a, #ff9f45, #b86bff, #6c7bff, #3cb4ff, #ff5c8a;
+  position: fixed;
+  border-radius: 10px;
+  pointer-events: none;
+  transition: opacity 0.2s;
 }
-.hunch-sidebar-title {
+.hunch-scope::before,
+.hunch-scope::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: var(--hunch-scope-ring);
+  border-radius: inherit;
+  background: conic-gradient(from var(--hunch-scope-angle, 0deg), var(--hunch-scope-colors));
+  /* Keep only the border band of the gradient. */
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: hunch-scope-spin 4s linear infinite;
+}
+/* Faint halo hugging the line. */
+.hunch-scope::after {
+  padding: var(--hunch-scope-glow);
+  inset: calc((var(--hunch-scope-glow) - var(--hunch-scope-ring)) / -2);
+  filter: blur(4px);
+  opacity: 0.35;
+}
+/* The viewport frame sits flush with the window edge. */
+.hunch-scope-page {
+  --hunch-scope-ring: 2px;
+  --hunch-scope-glow: 6px;
+  border-radius: 0;
+}
+.hunch-scope-page::after {
+  inset: 0;
+  filter: blur(6px);
+  opacity: 0.3;
+}
+/* Spotlight: dims the page around the current hit. The cutout's huge spread shadow is the dimming;
+   a hairline and a soft halo lift the lit paragraph off it, like a focused macOS window. */
+.hunch-spotlight {
+  --hunch-spotlight-dim: rgba(0, 0, 0, 0.32);
+  --hunch-spotlight-halo: rgba(255, 255, 255, 0.5);
+  position: fixed;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 0.5px var(--hunch-spotlight-halo),
+    0 0 24px 4px rgba(0, 0, 0, 0.18),
+    0 0 0 200vmax var(--hunch-spotlight-dim);
+  transition: opacity 0.3s var(--hunch-ease);
+}
+@starting-style {
+  .hunch-spotlight {
+    opacity: 0;
+  }
+}
+.hunch-spotlight-dark {
+  --hunch-spotlight-dim: rgba(0, 0, 0, 0.55);
+  --hunch-spotlight-halo: rgba(255, 255, 255, 0.18);
+}
+/* Matches the page badge in content.css: centered on a line 4px above the paragraph, 4px in from
+   its right edge. The cutout is padded 8px, hence 4px and 12px here. */
+.hunch-spotlight-score {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  translate: 0 -50%;
+  font:
+    600 10.5px / 1 -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: rgba(0, 0, 0, 0.78);
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  backdrop-filter: blur(12px) saturate(1.8);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+  padding: 4px 7px;
+  border-radius: 999px;
+}
+.hunch-spotlight-dark .hunch-spotlight-score {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(44, 44, 46, 0.92);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+}
+/* Safari find-style bounce on each new paragraph; only transforms, so it stays on the compositor. */
+.hunch-spotlight-pop {
+  animation: hunch-spotlight-pop 0.42s var(--hunch-ease);
+}
+@keyframes hunch-spotlight-pop {
+  0% {
+    scale: 1.06;
+  }
+  45% {
+    scale: 0.985;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes hunch-scope-spin {
+  to {
+    --hunch-scope-angle: 360deg;
+  }
+}
+.hunch-scope-label {
+  position: absolute;
+  bottom: 100%;
+  left: 10px;
+  translate: 0 50%;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--hunch-material-solid);
+  box-shadow: 0 0 0 0.5px var(--hunch-edge);
+  color: var(--hunch-accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* The viewport frame speaks for itself; a label there would sit on page content. */
+.hunch-scope-page .hunch-scope-label {
+  display: none;
+}
+.hunch-scope-selection .hunch-scope-label {
+  left: -1px;
+  translate: none;
+  margin-bottom: 3px;
+}
+/* No room above the box: tuck the label inside its top edge. */
+.hunch-scope-tight .hunch-scope-label {
+  top: 4px;
+  bottom: auto;
+  translate: none;
+  margin: 0;
+}
+.hunch-scope-selection.hunch-scope-tight .hunch-scope-label {
+  top: 100%;
+  margin-top: 3px;
+}
+
+/* Copy button beside a paragraph's score badge; the same frosted capsule as the badge, so it reads as part of the highlight.
+   Its palette follows the paragraph (.hunch-copy-dark mirrors .hunch-dark), not the bar theme. */
+.hunch-copy {
+  pointer-events: auto;
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 999px;
+  color: rgba(0, 0, 0, 0.72);
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  backdrop-filter: blur(12px) saturate(1.8);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.hunch-copy:hover {
+  color: rgba(0, 0, 0, 0.9);
+  background: rgba(255, 255, 255, 0.95);
+}
+.hunch-copy.hunch-copy-dark {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(44, 44, 46, 0.8);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.hunch-copy.hunch-copy-dark:hover {
+  color: #fff;
+  background: rgba(58, 58, 60, 0.92);
+}
+.hunch-copy.hunch-copy-done {
+  color: #fff;
+  background: var(--hunch-green);
+}
+.hunch-copy .hunch-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.75;
+}
+.hunch-copy-buffer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  opacity: 0;
+}
+
+/* Settings panel: a card above the bar, inside the dock so it moves with it. */
+.hunch-settings-toggle {
+  width: 26px;
+  padding: 0;
+}
+.hunch-settings-toggle:hover {
+  color: var(--hunch-label);
+}
+.hunch-settings-toggle[aria-pressed="true"] .hunch-icon {
+  fill: none;
+}
+.hunch-settings {
+  position: relative;
+  order: -1;
+  pointer-events: auto;
+  align-self: flex-end;
+  width: min(340px, 100%);
+  padding: 10px 14px 12px;
+  border-radius: 16px;
+  font-size: 12.5px;
+  color: var(--hunch-label);
+  animation: hunch-rise 0.25s var(--hunch-ease);
+}
+.hunch-settings[hidden] {
+  display: none;
+}
+.hunch-settings-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px 8px;
+  gap: 4px;
+  margin-bottom: 4px;
 }
-.hunch-sidebar-title strong {
-  font-size: 20px;
+.hunch-settings-title {
+  font-size: 13px;
+  font-weight: 600;
 }
-.hunch-sidebar-title span {
+.hunch-help-toggle[aria-expanded="true"],
+.hunch-note-toggle[aria-expanded="true"] {
+  color: var(--hunch-accent-text);
+}
+.hunch-reset-toggle {
+  margin-left: auto;
+}
+.hunch-setting-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hunch-note-toggle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.hunch-note-toggle .hunch-icon {
+  width: 14px;
+  height: 14px;
+}
+.hunch-note {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--hunch-fill);
+  color: var(--hunch-secondary-label);
   font-size: 12px;
-  color: #a8a7b3;
-  flex: 1;
+  line-height: 1.55;
+  user-select: text;
 }
-.hunch-tabs {
+.hunch-note-child {
+  margin-left: 24px;
+}
+.hunch-note p {
+  margin: 0 0 4px;
+}
+.hunch-note ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.hunch-note b {
+  font-weight: 600;
+  color: var(--hunch-label);
+}
+/* Reset confirmation: covers the panel so nothing behind it can be changed mid-question. */
+.hunch-confirm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: inherit;
+  background: light-dark(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.4));
+  animation: hunch-fade 0.15s;
+}
+.hunch-confirm-card {
+  width: 100%;
+  max-width: 260px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--hunch-material-solid);
+  box-shadow: var(--hunch-shadow);
+  text-align: center;
+  animation: hunch-rise 0.2s var(--hunch-ease);
+}
+.hunch-confirm-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.hunch-confirm-body {
+  margin: 4px 0 12px;
+  color: var(--hunch-secondary-label);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.hunch-confirm-actions {
   display: flex;
   gap: 8px;
-  padding: 8px 16px 12px;
-  border-bottom: 1px solid #3a3944;
 }
-.hunch-tabs button {
+.hunch-confirm-actions button {
   flex: 1;
-  border-color: transparent;
 }
-.hunch-tabs [aria-pressed="true"] {
-  color: #fbbf24;
-  border-color: #86703a;
-  background: #373125;
+.hunch-danger {
+  background: var(--hunch-red);
+  color: #fff;
 }
-.hunch-notice {
-  font-size: 12px;
-  color: #fcd66b;
-  padding: 0 16px;
+.hunch-danger:hover {
+  background: var(--hunch-red);
+  opacity: 0.88;
 }
-.hunch-notice:not(:empty) {
-  padding-top: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #3a3944;
+.hunch-help {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--hunch-fill);
+  color: var(--hunch-secondary-label);
+  line-height: 1.55;
+  user-select: text;
 }
-.hunch-result-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.hunch-result {
-  padding: 15px 16px;
-  border-bottom: 1px solid #3a3944;
-}
-.hunch-selected {
-  border-left: 3px solid #fbbf24;
-  padding-left: 13px;
-  background: #26242b;
-}
-.hunch-result-pick {
-  display: block;
-  text-align: left;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  width: 100%;
-}
-.hunch-result-pick:hover {
-  background: transparent;
-}
-.hunch-result-heading {
-  display: block;
-  font-size: 12px;
-  color: #a8a7b3;
-  margin-bottom: 6px;
-}
-.hunch-score {
-  display: block;
-  color: #fcd66b;
-  font-size: 12px;
-  margin-bottom: 9px;
-}
-.hunch-excerpt-text {
-  display: block;
+.hunch-help ol {
   margin: 0;
-  font:
-    16px / 1.8 Georgia,
-    "Songti SC",
-    serif;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
+  padding-left: 18px;
 }
-.hunch-result-actions {
+.hunch-help li + li {
+  margin-top: 4px;
+}
+.hunch-setting {
   display: flex;
-  gap: 7px;
-  margin-top: 12px;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border-top: 0.5px solid var(--hunch-separator);
 }
-.hunch-result-actions button {
-  font-size: 12px;
+.hunch-setting-label {
+  flex: 1;
 }
-.hunch-condition-evidence {
-  margin: 9px 0 0;
-  padding: 0;
-  list-style: none;
-  color: #d1c7a5;
-  font-size: 12px;
+.hunch-setting .hunch-segmented button {
+  gap: 4px;
+  padding: 0 8px;
 }
-.hunch-condition-evidence li {
-  margin: 4px 0;
-  overflow-wrap: anywhere;
+.hunch-setting .hunch-segmented .hunch-icon {
+  width: 13px;
+  height: 13px;
 }
-.hunch-empty {
-  padding: 28px 22px;
-  margin: 0;
-  line-height: 1.8;
-  color: #a8a7b3;
+.hunch-range {
+  width: 120px;
+  accent-color: var(--hunch-accent);
 }
-.hunch-source {
-  display: block;
-  color: #80bfff;
-  margin-bottom: 10px;
-  overflow-wrap: anywhere;
+.hunch-range-value {
+  width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--hunch-secondary-label);
 }
-.hunch-saved-date {
-  font-size: 11px;
-  color: #a8a7b3;
-  margin: 10px 0 0;
+.hunch-setting-group {
+  border-top: 0.5px solid var(--hunch-separator);
 }
-.hunch-export {
-  margin: 12px 16px;
+.hunch-setting-group > .hunch-setting:first-child {
+  border-top: 0;
 }
-.hunch-sidebar-footer {
-  padding: 10px 16px;
-  border-top: 1px solid #3a3944;
-  font-size: 11px;
-  color: #a8a7b3;
+/* Child setting: indented under its switch with an elbow connector, dimmed while the switch is off. */
+.hunch-setting-child {
+  position: relative;
+  margin-left: 6px;
+  padding-left: 18px;
+  border-top: 0;
+  transition: opacity 0.2s;
 }
-.hunch-marks {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: var(--hunch-bar-height);
-  width: 14px;
-  background: rgba(28, 27, 34, 0.35);
-}
-.hunch-mark {
-  pointer-events: auto;
-  position: absolute;
-  right: 2px;
-  width: 10px;
-  height: 3px;
-  background: #fbbf24;
-  border-radius: 1px;
-  cursor: pointer;
-}
-.hunch-mark-current {
-  height: 5px;
-  width: 14px;
-  right: 0;
-  background: #ff5b5b;
-}
-.hunch-viewport {
+.hunch-setting-child::before {
+  content: "";
   position: absolute;
   left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  top: -4px;
+  width: 10px;
+  height: 50%;
+  border-left: 1.5px solid var(--hunch-separator);
+  border-bottom: 1.5px solid var(--hunch-separator);
+  border-bottom-left-radius: 6px;
+}
+.hunch-setting-hint {
+  display: none;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--hunch-tertiary-label);
+}
+.hunch-setting-child[data-disabled] {
+  opacity: 0.45;
+}
+.hunch-setting-child[data-disabled] .hunch-setting-label {
+  display: flex;
+  flex-direction: column;
+}
+.hunch-setting-child[data-disabled] .hunch-setting-hint {
+  display: block;
+}
+.hunch-range:disabled {
+  cursor: not-allowed;
+}
+.hunch-switch {
+  appearance: none;
+  position: relative;
+  width: 36px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--hunch-fill-hover);
+  transition: background 0.2s;
+  cursor: default;
+}
+.hunch-switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: translate 0.2s var(--hunch-ease);
+}
+.hunch-switch:checked {
+  background: var(--hunch-green);
+}
+.hunch-switch:checked::before {
+  translate: 14px 0;
+}
+.hunch-switch:focus-visible,
+.hunch-range:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--hunch-focus);
+}
+
+@keyframes hunch-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hunch-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+/* Bar entrance: slides up from below the viewport edge. */
+@keyframes hunch-enter {
+  from {
+    opacity: 0;
+    transform: translateY(calc(100% + 32px));
+  }
+  40% {
+    opacity: 1;
+  }
 }
 @media (max-width: 700px) {
-  .hunch-controls {
+  .hunch-dock {
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .hunch-toolbar {
     flex-wrap: wrap;
-  }
-  .hunch-input {
-    flex-basis: 100%;
-    order: 1;
-  }
-  .hunch-conditions {
-    font-size: 13px;
-  }
-  .hunch-sidebar {
-    width: min(390px, calc(100vw - 28px));
-    right: 18px;
-    top: 10px;
-  }
-  .hunch-meta {
-    flex-basis: 100%;
-    margin-left: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hunch-progress-fill {
+  *,
+  .hunch-bar,
+  .hunch-scope::before,
+  .hunch-scope::after {
+    animation: none;
     transition: none;
   }
 }

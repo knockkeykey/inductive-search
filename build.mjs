@@ -30,16 +30,37 @@ const manifests = {
 
 const assets = {
   "src/options.html": "options.html",
+  "src/viewer.html": "viewer.html",
   "src/content.css": "content.css",
   "src/content/ui.css": "ui.css",
   "src/icons": "icons",
+  // pdf.js runs its parser in a module worker and loads CJK character maps on demand.
+  "node_modules/pdfjs-dist/build/pdf.worker.min.mjs": "pdf.worker.min.mjs",
+  "node_modules/pdfjs-dist/cmaps": "pdfjs/cmaps",
+  "node_modules/pdfjs-dist/standard_fonts": "pdfjs/standard_fonts",
 };
 
 rmSync("dist", { recursive: true, force: true });
 const bundler = await esbuild.context({
-  entryPoints: { background: "src/background.ts", content: "src/content.ts", options: "src/options.ts" },
+  entryPoints: {
+    background: "src/background.ts",
+    content: "src/content.ts",
+    options: "src/options.ts",
+  },
   bundle: true,
   format: "iife",
+  target: ["firefox128", "chrome120"],
+  outdir: "dist/bundle",
+  sourcemap: watch ? "inline" : false,
+  logLevel: "info",
+  plugins: [{ name: "layout", setup: (build) => build.onEnd(layoutBrowserFolders) }],
+});
+// pdf.js ships as ES modules with top-level await, so the viewer page loads a module bundle.
+const viewer = await esbuild.context({
+  entryPoints: { viewer: "src/viewer/viewer.ts" },
+  bundle: true,
+  format: "esm",
+  platform: "browser",
   target: ["firefox128", "chrome120"],
   outdir: "dist/bundle",
   sourcemap: watch ? "inline" : false,
@@ -57,8 +78,8 @@ function layoutBrowserFolders() {
   }
 }
 
-if (watch) await bundler.watch();
+if (watch) await Promise.all([bundler.watch(), viewer.watch()]);
 else {
-  await bundler.rebuild();
-  await bundler.dispose();
+  await Promise.all([bundler.rebuild(), viewer.rebuild()]);
+  await Promise.all([bundler.dispose(), viewer.dispose()]);
 }

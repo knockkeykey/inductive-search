@@ -1,37 +1,38 @@
-# Inductive search（感应式搜索）privacy policy
+# 感应式查找隐私政策
 
-Inductive search is a browser extension that finds the paragraph on a web page that answers a question you type. This page describes what it does with data.
+感应式查找是一款浏览器扩展，可在网页中查找能回答所提问题的段落。本政策说明扩展如何处理数据。
 
-## What is sent, and when
+## 发送哪些数据，以及何时发送
 
-When you explicitly submit a search while the Inductive search bar is open, text from the selected scope (whole page, article or current selection), your query and any conditions are sent to your selected provider: TypeSafe AI (`api.typesafe.ai`), OpenRouter (`openrouter.ai`) or OpenLux (`api.openlux.ai`). All routes use Jev to score each paragraph. Nothing is sent before you open the bar, and nothing is sent from pages where you have not opened it. Closing the bar cancels the client request. Requests already received by the provider may still be processed or billed. Typing alone does not submit a search.
+仅当你在查找栏打开时主动提交搜索，所选范围内的文字（整页、正文或当前选区）、搜索内容和条件才会发送到你选择的服务商：TypeSafe AI（`api.typesafe.ai`）、OpenRouter（`openrouter.ai`）或 OpenLux（`api.openlux.ai`）。所有接口都使用 Jev 为各段落评分。在打开查找栏之前，以及未打开查找栏的网页中，都不会发送数据。关闭查找栏会取消客户端请求；服务商已经收到的请求仍可能继续处理或产生费用。仅输入文字不会提交搜索。搜索后页面新增内容时，扩展只会提示，不会自动发送；点击“新增 N”后才发送新增的文字。
 
-The page's URL and title are included with the text so the model has context. Your API key is sent in the request's authorization header.
+页面网址和标题会与文字一并发送，为模型提供上下文。API 密钥会放在请求的授权标头中发送。
 
-TypeSafe's handling of that data is governed by their own policies at <https://typesafe.ai/legal/privacy-policy>. When you choose OpenRouter, requests go through OpenRouter to TypeSafe; OpenRouter's policy is at <https://openrouter.ai/privacy>. Inductive search has no server of its own.
+TypeSafe 如何处理这些数据，遵循其[隐私政策](https://typesafe.ai/legal/privacy-policy)。选择 OpenRouter 时，请求会经由 OpenRouter 转发给 TypeSafe；OpenRouter 的[隐私政策](https://openrouter.ai/privacy)也适用。感应式查找没有自己的服务器。
 
-When you choose OpenLux, requests go to OpenLux for relay to the model provider. OpenLux's policy is at <https://www.openlux.ai/policies/privacy>.
+选择 OpenLux 时，请求会发送到 OpenLux，再由其转发给模型服务商。请参阅 OpenLux 的[隐私政策](https://www.openlux.ai/policies/privacy)。
 
-The settings page also requests the selected provider's model list. OpenRouter's public model list is fetched without your key or page content. TypeSafe's model list uses your TypeSafe key. OpenLux's model choices are local and do not make a model-list request.
+设置页也会请求所选服务商的模型列表。获取 OpenRouter 的公开模型列表时不会发送你的密钥或网页内容。获取 TypeSafe 模型列表时会使用你的 TypeSafe 密钥。OpenLux 的模型选项保存在本地，不会发送模型列表请求。
 
-## What is stored
+使用文档查看器时，PDF 和 Word 文件在本机读取和转换，文件本身不会上传。对于网页上的 PDF，查看器会重新下载该文件，这需要你点击“允许访问”授予该网站的读取权限（可选权限，按网站授予）。和网页一样，只有点击“搜索”后，提取的文字、文件名或网址才会发送给所选服务商。
 
-Your API keys and chosen models are stored separately for each provider in the browser's extension storage on your device. They are not synced anywhere by Inductive search. A key is only sent to the provider it belongs to. Switching providers does not copy a key to the other provider.
+## 存储哪些数据
 
-Saved excerpts include only the original text you choose to save, page title and URL, section heading, search query or conditions, scope and saving time. They stay in extension local storage until you delete them or uninstall the extension. They are not sent along with later searches and are not synced to a cloud service. Copy and Markdown export happen only when you click those actions.
+你的 API 密钥和所选模型会按服务商分别保存在本机浏览器扩展的存储空间中，不会由感应式查找同步到其他位置。密钥只会发送给对应的服务商。切换服务商不会把密钥复制到其他服务商。
 
-The excerpt sidebar uses a closed shadow root so ordinary page scripts cannot read saved excerpts through the host page DOM. Do not save sensitive excerpts on shared browser profiles.
+界面偏好（外观、是否标出搜索范围、相关度阈值）也保存在扩展的本地存储中。搜索结果不会被保存。
 
-## What is not collected
+## 不会收集哪些数据
 
-Inductive search has no analytics, no telemetry, no crash reporting, no accounts, and no tracking. It does not read your browsing history, other tabs, cookies, or form contents. It does not run on pages you have not opened it on.
+感应式查找不使用分析、遥测、崩溃报告、账户或跟踪功能。它不会读取浏览历史、Cookie 或表单内容。扩展不会预先在网页中注入脚本：只有你在某个网页上打开感应式查找时，才会在该网页运行。
 
-## Permissions
+## 权限说明
 
-- **Access to `api.typesafe.ai`, `openrouter.ai` and `api.openlux.ai`**: to send searches to the selected provider and list its models where needed.
-- **Active tab and scripting**: to read the text of the page you invoked Inductive search on and draw the highlights.
-- **Storage**: to keep your key and model choice.
+- **访问 `api.typesafe.ai`、`openrouter.ai` 和 `api.openlux.ai`**：向所选服务商发送搜索请求，并在需要时获取其模型列表。
+- **活动标签页和脚本执行**：读取你启动感应式查找的网页文字并绘制高亮。
+- **存储**：保存你的密钥和模型选择。
+- **读取网站（可选，默认不授予）**：文档查看器读取网页上的 PDF 时，只按需请求该 PDF 所在网站的权限。拒绝或撤销后，网页搜索不受影响。
 
-## Contact
+## 联系方式
 
-Questions about this policy: open an issue at <https://github.com/knockkeykey/inductive-search/issues>.
+如对本政策有疑问，请在 GitHub 上[提交问题](https://github.com/knockkeykey/inductive-search/issues)。

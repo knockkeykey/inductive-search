@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>感应式查找样式预览</title>
+<link rel="stylesheet" href="../src/content.css">
+<style>
+  body { margin: 0; padding: 56px 60px 360px; font: 17px/1.9 "PingFang SC", serif; }
+  body[data-page="light"] { background: #fff; color: #202122; }
+  body[data-page="dark"] { background: #0d1117; color: #c9d1d9; }
+  body[data-page="image"] { background: radial-gradient(circle at 20% 30%, #ff6b6b, transparent 40%), radial-gradient(circle at 80% 20%, #4dabf7, transparent 45%), radial-gradient(circle at 60% 80%, #51cf66, transparent 40%), repeating-linear-gradient(45deg, #222 0 12px, #fab005 12px 24px); color: #fff; text-shadow: 0 1px 3px #000; }
+  #dev { position: fixed; top: 8px; left: 8px; z-index: 1; display: flex; gap: 4px; flex-wrap: wrap; font: 12px system-ui; }
+  #dev button { font: inherit; }
+  h1 { font-weight: 400; }
+</style>
+</head>
+<body data-page="light">
+  <div id="dev">
+    <button data-page="light">浅色网页</button><button data-page="dark">深色网页</button><button data-page="image">图片背景</button>
+    <span>｜状态：</span><span id="states"></span>
+  </div>
+  <article>
+    <h1>背影</h1>
+    <p>我與父親不相見已二年餘了，我最不能忘記的是他的背影。那年冬天，祖母死了，父親的差使也交卸了，正是禍不單行的日子，我從北京到徐州，打算跟着父親奔喪回家。</p>
+    <p>回家變賣典質，父親還了虧空；又借錢辦了喪事。這些日子，家中光景很是慘澹，一半爲了喪事，一半爲了父親賦閒。喪事完畢，父親要到南京謀事，我也要回北京念書，我們便同行。</p>
+    <p>到南京時，有朋友約去游逛，勾留了一日；第二日上午便須渡江到浦口，下午上車北去。父親因爲事忙，本已說定不送我，叫旅館裏一個熟識的茶房陪我同去。</p>
+    <p>我們過了江，進了車站。我買票，他忙着照看行李。行李太多了，得向腳夫行些小費，纔可過去。他便又忙着和他們講價錢。</p>
+    <p>我說道，「爸爸，你走吧。」他望車外看了看，說，「我買幾個橘子去。你就在此地，不要走動。」</p>
+  </article>
+  <script src="preview.js"></script>
+</body>
+</html>

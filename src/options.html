@@ -1,36 +1,74 @@
 <!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>感应式搜索设置</title>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>感应式查找设置</title>
 <style>
-  body { font: 15px/1.5 -apple-system, system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #111; }
-  label { display: block; font-weight: 600; margin-top: 20px; }
-  input, select { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid #bbb; border-radius: 6px; margin-top: 6px; }
-  small { color: #555; }
+  :root {
+    color-scheme: light dark;
+    --label: rgba(0,0,0,.88); --secondary: rgba(60,60,67,.62); --separator: rgba(60,60,67,.16);
+    --bg: #f5f5f7; --group: #fff; --fill: rgba(120,120,128,.12); --accent: #007aff; --accent-hover: #0068d9;
+    --focus: rgba(0,122,255,.4); --green: #248a3d; --orange: #c93400; --orange-tint: rgba(255,149,0,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --label: rgba(255,255,255,.92); --secondary: rgba(235,235,245,.6); --separator: rgba(84,84,88,.6);
+      --bg: #1c1c1e; --group: #2c2c2e; --fill: rgba(120,120,128,.24); --accent: #0a84ff; --accent-hover: #409cff;
+      --focus: rgba(10,132,255,.6); --green: #30d158; --orange: #ff9f0a; --orange-tint: rgba(255,159,10,.16);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; background: var(--bg); color: var(--label);
+    max-width: 620px; margin: 0 auto; padding: 36px 20px 48px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 6px; }
+  p.lede { color: var(--secondary); margin: 0 0 24px; }
+  .group { background: var(--group); border-radius: 10px; box-shadow: 0 0 0 .5px var(--separator); margin-bottom: 8px; }
+  label.row-item { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; font-weight: 500; position: relative; }
+  label.row-item + label.row-item::before { content: ""; position: absolute; top: 0; left: 14px; right: 0; height: .5px; background: var(--separator); }
+  .footnote { display: block; color: var(--secondary); font-size: 12px; font-weight: 400; padding: 0 14px; margin: 0 0 22px; }
+  small { color: var(--secondary); font-weight: 400; font-size: 12px; }
+  input, select { width: 100%; font: inherit; font-weight: 400; color: inherit; height: 30px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--fill); outline: none; }
+  select { appearance: none; padding-right: 28px;
+    background: var(--fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%238e8e93' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 8 10 4.5 13.5 8M6.5 12l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E") no-repeat right 8px center / 13px; }
+  input:focus, select:focus { box-shadow: 0 0 0 3px var(--focus); }
   .row { display: flex; gap: 8px; align-items: center; }
   .row input { flex: 1; cursor: pointer; }
-  .row input:focus { border-color: #d97706; outline: none; box-shadow: 0 0 0 2px rgba(217,119,6,.25); }
-  button.secondary { margin-top: 6px; background: #fff; color: #111; }
-  #shortcutNote { display: block; min-height: 1.2em; margin-top: 4px; }
-  button.link { all: unset; color: #1d4ed8; text-decoration: underline; cursor: pointer; font: inherit; }
-  button { margin-top: 20px; font: inherit; padding: 8px 16px; border-radius: 6px; border: 1px solid #333; background: #111; color: #fff; cursor: pointer; }
-  #saved { margin-left: 10px; color: #15803d; }
+  #shortcutNote { display: block; min-height: 1.2em; }
+  #nokey { padding: 10px 12px; border-radius: 8px; background: var(--orange-tint); color: var(--orange); margin: 0 0 16px; }
+  #nokey a { color: inherit; font-weight: 600; }
+  button { font: inherit; height: 28px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--fill); color: inherit; cursor: default; white-space: nowrap; }
+  button:hover { filter: brightness(.96); }
+  button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+  button:disabled { opacity: .4; }
+  button.link { all: unset; color: var(--accent); cursor: pointer; font: inherit; }
+  button.link:hover { text-decoration: underline; }
+  #save { background: var(--accent); color: #fff; font-weight: 600; padding: 0 20px; }
+  #save:hover:not(:disabled) { background: var(--accent-hover); filter: none; }
+  .actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  #saved { color: var(--green); }
 </style></head>
 <body>
-  <h1>感应式搜索</h1>
-  <p>The page text, URL, title and query are sent to your selected provider only while the find bar is open.</p>
-  <label>API provider <select id="provider" disabled><option value="typesafe">TypeSafe (official)</option><option value="openrouter">OpenRouter (Jev)</option><option value="openlux">OpenLux (Jev)</option></select></label>
-  <p id="nokey" style="display:none;padding:10px 12px;border-radius:6px;background:#fef3c7;color:#92400e">You need an API key before the first search. Create one at <a id="keyLink" href="https://console.typesafe.ai/keys" target="_blank" rel="noreferrer">TypeSafe keys</a>, paste it below, and save.</p>
-  <label><span id="keyLabel">TypeSafe API key</span> <input id="apiKey" type="password" placeholder="apikey_…" autocomplete="off"></label>
-  <label>Model <small id="modelNote"></small>
-    <select id="model"></select></label>
-  <small>OpenRouter and OpenLux use Jev's System One API. Chat models such as GPT and Claude are not supported. Each provider keeps its own key and model.</small>
-  <label>Shortcut <small id="shortcutHint">Click the field and press the keys you want.</small>
-    <span class="row">
-      <input id="shortcut" type="text" readonly placeholder="…">
-      <button id="resetShortcut" type="button" class="secondary">Reset to default</button>
-    </span>
-    <small id="shortcutNote"></small></label>
-  <button id="save" type="button" disabled>Save</button><span id="saved"></span>
+  <h1>感应式查找</h1>
+  <p class="lede">仅当查找栏打开并提交搜索时，页面文字、网址、标题和搜索内容才会发送给你选择的服务商。</p>
+  <p id="nokey" style="display:none">首次搜索前需要 API 密钥。请前往 <a id="keyLink" href="https://console.typesafe.ai/keys" target="_blank" rel="noreferrer">TypeSafe 密钥</a>创建密钥，粘贴到下方并保存。</p>
+  <div class="group">
+    <label class="row-item">API 服务商 <select id="provider" disabled><option value="typesafe">TypeSafe（官方）</option><option value="openrouter">OpenRouter（Jev）</option><option value="openlux">OpenLux（Jev）</option></select></label>
+    <label class="row-item"><span id="keyLabel">TypeSafe API 密钥</span> <input id="apiKey" type="password" placeholder="apikey_…" autocomplete="off"></label>
+    <label class="row-item"><span>模型 <small id="modelNote"></small></span>
+      <select id="model"></select></label>
+  </div>
+  <small class="footnote">OpenRouter 和 OpenLux 使用 Jev 的 System One API，不支持 GPT、Claude 等聊天模型。每个服务商分别保存自己的密钥和模型。</small>
+  <div class="group">
+    <label class="row-item"><span>快捷键 <small id="shortcutHint">点击此处并按下想设置的组合键。</small></span>
+      <span class="row">
+        <input id="shortcut" type="text" readonly placeholder="…">
+        <button id="resetShortcut" type="button" class="secondary">恢复默认</button>
+      </span>
+      <small id="shortcutNote"></small></label>
+  </div>
+  <small class="footnote">在 PDF 网页上按快捷键会自动用文档查看器打开。本地的 PDF、Word（.docx）文件可以<a href="viewer.html" target="_blank">在文档查看器中打开</a>。</small>
+  <div class="actions"><button id="save" type="button" disabled>保存</button><span id="saved"></span></div>
   <script src="options.js"></script>
 </body>
 </html>

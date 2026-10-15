@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 
 const temp = await mkdtemp(path.join(tmpdir(), "hunch-activation-"));
@@ -38,8 +39,9 @@ await build({
             storage: { local: { get: async () => {
               state.events.push("storage");
               return { settings: { provider: "openlux", profiles: { openlux: { apiKey: "dummy-key", model: "jev-1.13.0" } } } };
-            } } },
+            } }, onChanged: event("storage-change") },
             permissions: {
+              onAdded: event("permission-added"), onRemoved: event("permission-removed"),
               contains: async () => state.apiAccess ?? true,
               request: async () => {
                 state.events.push("permission-request");
@@ -105,5 +107,12 @@ test("search without provider permission opens settings and explains how to reco
   await new Promise(resolve => setImmediate(resolve));
   assert.ok(globalThis.hunchActivation.events.includes("options"));
   assert.equal(messages.at(-1).type, "failure");
-  assert.match(messages.at(-1).message, /OpenLux.*settings.*Save/);
+  assert.match(messages.at(-1).message, /OpenLux.*设置.*保存/);
+});
+
+test("the content script is injected on demand instead of into every page", () => {
+  const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
+  assert.equal(manifest.content_scripts, undefined);
+  assert.ok(!manifest.host_permissions.includes("<all_urls>"));
+  assert.deepEqual(manifest.optional_host_permissions, ["<all_urls>"]);
 });

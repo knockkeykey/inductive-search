@@ -38,7 +38,7 @@ await build({
     },
   }],
 });
-const { answer, createClient, defaultSettings, hasApiAccess, listModels, loadSettings, requestApiAccess, saveSettings } =
+const { answer, refine, retryFor, createClient, defaultSettings, hasApiAccess, listModels, loadSettings, requestApiAccess, saveSettings } =
   await import(pathToFileURL(outfile).href);
 const realFetch = globalThis.fetch;
 after(async () => {
@@ -159,7 +159,7 @@ test("OpenLux rejects chat responses, missing answers and invalid probabilities"
     globalThis.fetch = async () => json(response);
     await assert.rejects(
       answer(search, { ...defaultSettings("openlux"), apiKey: "openlux-test-key" }, new AbortController().signal, () => {}),
-      /OpenLux returned an invalid Jev probability/,
+      /OpenLux 返回了无效的 Jev 概率/,
     );
   }
 });
@@ -171,7 +171,7 @@ test("model discovery adapts OpenRouter's shape and excludes chat models", async
     return json({ data: [{ id: "typesafe/jev-1.13", name: "Jev" }, { id: "typesafe/jev-router", name: "Chat router" }, { id: "openai/gpt-test", name: "Chat" }] });
   };
   assert.deepEqual(await listModels(defaultSettings("openrouter")), [
-    { name: "~typesafe/jev-latest", description: "Latest Jev" },
+    { name: "~typesafe/jev-latest", description: "最新 Jev" },
     { name: "typesafe/jev-1.13", description: "Jev" },
   ]);
   globalThis.fetch = async () => json({ models: [{ name: "jev-1.13", description: "Jev" }] });
@@ -193,6 +193,20 @@ test("authentication failure reaches the caller instead of becoming an absent an
   );
 });
 
+test("a failed batch reports the provider's status, message and request id", async () => {
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: { message: "Insufficient credits" } }), {
+      status: 402, headers: { "Content-Type": "application/json", "x-typesafe-request-id": "req_123" },
+    });
+  const progress = [];
+  await assert.rejects(
+    answer(search, { ...defaultSettings("openrouter"), apiKey: "router-test-key" }, new AbortController().signal, (p) => progress.push(p)),
+    /OpenRouter 返回 HTTP 402：账户余额或额度不足。原始信息：Insufficient credits（请求 ID：req_123）/,
+  );
+  assert.equal(progress.at(-1).failed, 1);
+  assert.match(progress.at(-1).error, /HTTP 402.*Insufficient credits/);
+});
+
 test("closing a search cancels the provider request without emitting more progress", async () => {
   const controller = new AbortController();
   globalThis.fetch = (_url, init) => new Promise((_resolve, reject) => {
@@ -202,4 +216,62 @@ test("closing a search cancels the provider request without emitting more progre
   const progress = [];
   await answer(search, { ...defaultSettings("openrouter"), apiKey: "router-test-key" }, controller.signal, (p) => progress.push(p));
   assert.deepEqual(progress, []);
+});
+
+test("large batches are not retried after a timeout; small ones are", () => {
+  assert.deepEqual(retryFor([{ id: "B001", text: "x".repeat(20_000) }]), { apiTimeoutError: false });
+  assert.deepEqual(retryFor([{ id: "B001", text: "short paragraph" }]), { apiTimeoutError: true });
+});
+
+test("refine scores each paragraph in its own request, never showing it the other paragraphs", async () => {
+  const pages = [];
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    pages.push(body.state.page_text);
+    const text = body.state.page_text;
+    // The B004 paragraph comes back invalid: only that paragraph loses its sentence scores.
+    const answers = text.includes("Three.")
+      ? { S001: { type: "noul", noul: 2 } }
+      : { S001: { type: "noul", noul: 0.2 }, S002: { type: "noul", noul: 0.9 } };
+    assert.deepEqual(Object.keys(body.questions), Object.keys(answers));
+    return json({ answers, model: "jev-1.13", usage: { input_tokens: 100, output_tokens: 1 } });
+  };
+  const result = await refine(
+    {
+      type: "refine",
+      url: search.url,
+      title: search.title,
+      query: search.query,
+      paragraphs: [
+        { id: "B001", sentences: [{ id: "S001", text: "One." }, { id: "S002", text: "Two." }] },
+        { id: "B004", sentences: [{ id: "S001", text: "Three." }] },
+      ],
+    },
+    { ...defaultSettings(), apiKey: "official-test-key" },
+  );
+  assert.deepEqual(pages.sort(), ["S001| One.\nS002| Two.", "S001| Three."]);
+  assert.deepEqual(result, { scores: { B001: { S001: 0.2, S002: 0.9 } } });
+});
+
+test("condition refine asks each sentence once per condition and combines like paragraph scores", async () => {
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    assert.deepEqual(Object.keys(body.questions).sort(), ["S001_C1", "S001_C2", "S002_C1", "S002_C2"]);
+    const answers = {
+      S001_C1: { type: "noul", noul: 0.9 },
+      S001_C2: { type: "noul", noul: 0.1 },
+      S002_C1: { type: "noul", noul: 0.6 },
+      S002_C2: { type: "noul", noul: 0.7 },
+    };
+    return json({ answers, model: "jev-1.13", usage: { input_tokens: 100, output_tokens: 1 } });
+  };
+  const paragraphs = [{ id: "B001", sentences: [{ id: "S001", text: "One." }, { id: "S002", text: "Two." }] }];
+  const settings = { ...defaultSettings(), apiKey: "official-test-key" };
+  for (const [combination, expected] of [["all", { S001: 0.1, S002: 0.6 }], ["any", { S001: 0.9, S002: 0.7 }]]) {
+    const result = await refine(
+      { type: "refine", url: search.url, title: search.title, query: "A；B", conditions: ["A", "B"], combination, paragraphs },
+      settings,
+    );
+    assert.deepEqual(result, { scores: { B001: expected } });
+  }
 });

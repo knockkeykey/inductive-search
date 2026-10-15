@@ -38,9 +38,9 @@ function showProvider(s: Settings) {
   activeProvider = s.provider;
   provider.value = s.provider;
   const config = PROVIDERS[s.provider];
-  keyLabel.textContent = `${config.name} API key`;
+  keyLabel.textContent = `${config.name} API 密钥`;
   keyLink.href = config.keyURL;
-  keyLink.textContent = `${config.name} keys`;
+  keyLink.textContent = `${config.name} 密钥`;
   apiKey.placeholder = config.keyPlaceholder;
   apiKey.value = s.apiKey;
   // Set a usable selection immediately, including when model discovery is offline.
@@ -53,7 +53,7 @@ function showProvider(s: Settings) {
 provider.addEventListener("change", () => {
   drafts[activeProvider] = currentSettings();
   showProvider(drafts[provider.value as Provider]);
-  saved.textContent = "Save to use this provider.";
+  saved.textContent = "保存后即可使用此服务商。";
 });
 
 function showKeyBanner(hasKey: boolean) {
@@ -74,33 +74,33 @@ async function recordShortcut(e: KeyboardEvent) {
   if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return; // wait for the real key
   const mac = (await browser.runtime.getPlatformInfo()).os === "mac";
   const combo = commandShortcutFromEvent(e, mac);
-  if (!combo) return void showShortcut("Use Ctrl, Alt or Cmd together with a letter, number or function key.");
+  if (!combo) return void showShortcut("请同时按下 Ctrl、Alt 或 Cmd 与字母、数字或功能键。");
   try {
     await setShortcut(combo);
-    await showShortcut("Saved");
+    await showShortcut("已保存");
   } catch (err) {
-    await showShortcut(err instanceof Error ? err.message : "Firefox refused that shortcut.");
+    await showShortcut(err instanceof Error ? err.message : "Firefox 不接受此快捷键。");
   }
   shortcut.blur();
 }
 
-shortcut.addEventListener("focus", () => (shortcut.value = "press keys…"));
+shortcut.addEventListener("focus", () => (shortcut.value = "请按下快捷键…"));
 shortcut.addEventListener("blur", () => void showShortcut(shortcutNote.textContent ?? ""));
 shortcut.addEventListener("keydown", (e) => void recordShortcut(e));
 field("resetShortcut").addEventListener("click", async () => {
   await resetShortcut();
-  await showShortcut("Back to the default");
+  await showShortcut("已恢复默认快捷键。");
 });
 
 async function modelChoices(settings: Settings): Promise<{ models: ModelChoice[]; note: string }> {
   const current = { name: settings.model, description: "" };
-  if (!settings.apiKey) return { models: [current], note: "Save an API key to see the models you can use." };
+  if (!settings.apiKey) return { models: [current], note: "保存 API 密钥后即可查看可用模型。" };
   try {
     const models = await listModels(settings);
     const selectedIsListed = models.some((m) => m.name === settings.model);
     return { models: selectedIsListed ? models : [current, ...models], note: "" };
   } catch (e) {
-    return { models: [current], note: `Could not list models: ${e instanceof Error ? e.message : String(e)}` };
+    return { models: [current], note: `无法获取模型列表：${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
@@ -113,7 +113,16 @@ async function loadModels(settings: Settings) {
   modelNote.textContent = note;
 }
 
-const labelFor = (m: ModelChoice) => (m.description ? `${m.name} (${m.description})` : m.name);
+const LOCALIZED_MODEL_DESCRIPTIONS: Record<string, string> = {
+  "jev-1.13.0": "System One 决策模型",
+  "jev-1.13.0:stable": "稳定路由（模型页面示例）",
+  "~typesafe/jev-latest": "最新 Jev",
+  "typesafe/jev-1.13": "Jev 1.13",
+};
+const labelFor = (m: ModelChoice) => {
+  const description = LOCALIZED_MODEL_DESCRIPTIONS[m.name];
+  return description ? `${m.name}（${description}）` : m.name;
+};
 
 async function load() {
   if (!canRebindShortcut) {
@@ -126,9 +135,9 @@ async function load() {
       shortcutsPageButton.className = "link";
       shortcutsPageButton.textContent = SHORTCUTS_PAGE;
       shortcutsPageButton.addEventListener("click", () => void openShortcutsPage());
-      shortcutNote.replaceChildren("Change it at ", shortcutsPageButton);
+      shortcutNote.replaceChildren("请在此页面修改：", shortcutsPageButton);
     } else {
-      shortcutNote.textContent = "This browser does not let extensions change their shortcut.";
+      shortcutNote.textContent = "此浏览器不允许扩展修改快捷键。";
     }
   }
   shortcut.value = await shortcutLabel();
@@ -151,12 +160,11 @@ async function save() {
   saveButton.disabled = true;
   provider.disabled = true;
   try {
-    if (!(await requestApiAccess(s.provider)))
-      throw new Error(`Permission to reach ${PROVIDERS[s.provider].name} denied.`);
+    if (!(await requestApiAccess(s.provider))) throw new Error(`未获准访问 ${PROVIDERS[s.provider].name}。`);
     await saveSettings(s);
     drafts[s.provider] = s;
     showKeyBanner(Boolean(s.apiKey));
-    saved.textContent = "Saved";
+    saved.textContent = "已保存";
     void loadModels(s);
   } catch (err) {
     saved.textContent = err instanceof Error ? err.message : String(err);
