@@ -660,7 +660,7 @@ textarea::placeholder {
   right: 12px;
   translate: 0 -50%;
   font:
-    600 10.5px / 1 -apple-system,
+    600 13px / 1 -apple-system,
     BlinkMacSystemFont,
     "SF Pro Text",
     sans-serif;
@@ -673,7 +673,7 @@ textarea::placeholder {
   box-shadow:
     0 0 0 0.5px rgba(0, 0, 0, 0.12),
     0 1px 4px rgba(0, 0, 0, 0.12);
-  padding: 4px 7px;
+  padding: 5px 10px;
   border-radius: 999px;
 }
 .hunch-spotlight-dark .hunch-spotlight-score {
@@ -1061,6 +1061,50 @@ textarea::placeholder {
     opacity: 1;
   }
 }
+/* Appearance picks: each icon acts out its option once as it is chosen. */
+.hunch-pop[data-value="light"] .hunch-icon {
+  animation: hunch-sun-rise 0.6s var(--hunch-ease);
+}
+.hunch-pop[data-value="dark"] .hunch-icon {
+  animation: hunch-moon-swing 0.7s var(--hunch-ease);
+}
+.hunch-pop[data-value="auto"] .hunch-icon {
+  animation: hunch-half-flip 0.6s var(--hunch-ease);
+}
+@keyframes hunch-sun-rise {
+  from {
+    transform: rotate(-120deg) scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: rotate(12deg) scale(1.2);
+    opacity: 1;
+  }
+}
+@keyframes hunch-moon-swing {
+  from {
+    transform: rotate(60deg) scale(0.5);
+    opacity: 0;
+  }
+  45% {
+    transform: rotate(-24deg) scale(1.15);
+    opacity: 1;
+  }
+  70% {
+    transform: rotate(10deg);
+  }
+  85% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes hunch-half-flip {
+  from {
+    transform: rotate(-180deg) scale(0.6);
+  }
+  65% {
+    transform: rotate(15deg) scale(1.15);
+  }
+}
 @media (max-width: 700px) {
   .hunch-dock {
     left: 8px;
@@ -1078,5 +1122,22 @@ textarea::placeholder {
   .hunch-scope::after {
     animation: none;
     transition: none;
+  }
+}
+
+/* Appearance switch: every surface eases between palettes together instead of snapping.
+   Applied only for the length of the switch, so it never slows hover or press feedback. */
+@media (prefers-reduced-motion: no-preference) {
+  :host(.hunch-theme-shift) *,
+  :host(.hunch-theme-shift) *::before,
+  :host(.hunch-theme-shift) *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must override each component's own transition list */
+    transition-property: color, background-color, border-color, outline-color, box-shadow, fill, stroke !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    transition-duration: 0.4s !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    transition-timing-function: var(--hunch-ease) !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    transition-delay: 0s !important;
   }
 }

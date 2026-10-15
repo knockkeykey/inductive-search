@@ -3,8 +3,17 @@ import type { Hit } from "./hits";
 import { icon } from "./icons";
 
 const SIZE = 20;
-// Room for the score badge that sits on the paragraph's top-right corner.
+// Room for the badge on the paragraph's top-right corner ("#1 · 相关度 0.92", see content.css).
+// Its width depends on the text, so it is estimated from the enlarged 13px badge: CJK glyphs are
+// about 13px, Latin digits and punctuation about 6.6px, plus 20px padding and the 4px inset.
 const BADGE = 46;
+function badgeRoom(el: HTMLElement | undefined) {
+  const text = el?.dataset.hunchBadge ?? el?.dataset.hunchP;
+  if (!text) return BADGE;
+  let width = 24;
+  for (const char of text) width += /[\u3000-\u9fff\uff00-\uffef]/.test(char) ? 13 : 6.6;
+  return Math.max(BADGE, Math.ceil(width) + 4);
+}
 const EDGE = 4;
 
 // A copy button pinned beside the score badge of the hovered paragraph (or the current one).
@@ -74,12 +83,12 @@ export class CopyButton {
     this.frame = 0;
     const el = this.target;
     const rect = el?.isConnected ? viewportRect(el) : undefined;
-    const visible = rect && rect.bottom > 0 && rect.top < window.innerHeight && rect.width > SIZE + BADGE;
+    const visible = rect && rect.bottom > 0 && rect.top < window.innerHeight && rect.width > SIZE + badgeRoom(el);
     this.root.hidden = !visible;
     if (!visible) return;
     // Match the paragraph's palette, which follows the page background rather than the bar theme.
     this.root.classList.toggle("hunch-copy-dark", !!el?.classList.contains("hunch-dark"));
-    const left = Math.min(rect.right - BADGE - SIZE, window.innerWidth - SIZE - EDGE);
+    const left = Math.min(rect.right - badgeRoom(el) - SIZE, window.innerWidth - SIZE - EDGE);
     const top = Math.max(rect.top - 4 - SIZE / 2, EDGE);
     Object.assign(this.root.style, { left: `${Math.max(left, EDGE)}px`, top: `${top}px` });
   }

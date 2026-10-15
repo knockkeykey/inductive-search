@@ -27,11 +27,13 @@ export interface BarHandlers {
   onStep(dir: 1 | -1): void;
   onClose(): void;
   onScopeVisible(): void;
-  onTheme(theme: Theme): void;
+  // origin: viewport point the new palette spreads out from (the picked button).
+  onTheme(theme: Theme, origin: { x: number; y: number }): void;
   onThreshold(value: number): void;
   onRefine(on: boolean): void;
   onSpotlight(on: boolean): void;
   onSentenceThreshold(value: number): void;
+  onCache(on: boolean): void;
   onResetSettings(): void;
   onRetry(): void;
 }
@@ -56,7 +58,7 @@ export class FindBar {
   private readonly input = element("input", {
     class: "hunch-input",
     type: "text",
-    placeholder: "问点什么，例如「父亲去买什么了」",
+    placeholder: "问点什么，例如「有什么优点」",
     "aria-label": "搜索问题",
     maxlength: "1000",
     autocomplete: "off",
@@ -239,6 +241,9 @@ export class FindBar {
   setSentenceThreshold(value: number) {
     this.settings.setSentenceThreshold(value);
   }
+  setCache(on: boolean) {
+    this.settings.setCache(on);
+  }
   // `count` new blocks appeared since the last search; 0 hides the chip.
   setPending(count: number) {
     this.refreshButton.hidden = !count;
@@ -318,6 +323,12 @@ class SettingsPanel {
   private readonly thresholdValue = element("output", { class: "hunch-range-value" });
   private readonly refine = element("input", { type: "checkbox", role: "switch", class: "hunch-switch" });
   private readonly spotlight = element("input", { type: "checkbox", role: "switch", class: "hunch-switch" });
+  private readonly cache = element("input", {
+    type: "checkbox",
+    role: "switch",
+    class: "hunch-switch",
+    "aria-label": "缓存搜索结果",
+  });
   private readonly sentence = element("input", {
     type: "range",
     class: "hunch-range",
@@ -381,6 +392,35 @@ class SettingsPanel {
       "只标出把握很大的句子，有时一句都不标。",
       true,
     );
+    const cacheNote = element(
+      "div",
+      { class: "hunch-note", id: `${id}-cache-note`, hidden: "" },
+      element("p", {}, "同一网页、同一问题再次搜索时，直接使用上次的结果，不再请求 API。"),
+      element(
+        "ul",
+        {},
+        element(
+          "li",
+          {},
+          element("b", {}, "同一网页："),
+          "网址相同（忽略 # 后面的部分），并且搜索范围内的文字没有变化。",
+        ),
+        element(
+          "li",
+          {},
+          element("b", {}, "同一问题："),
+          "忽略首尾空格、多余空格、英文大小写和句末标点后相同；条件搜索还要求条件和「全部 / 任一」一致。",
+        ),
+        element("li", {}, "切换服务商或模型后不会命中。"),
+        element("li", {}, "只缓存全部成功的搜索；每条保留 7 天，最多 200 条，超出时删除最久未使用的。"),
+        element("li", {}, "只在本机保存网址和文字的哈希与打分结果，不保存网页原文。"),
+        element("li", {}, "关闭开关会立即清空全部缓存。"),
+      ),
+    );
+    const cacheButton = iconButton("question", "这是什么？", "hunch-note-toggle");
+    cacheButton.setAttribute("aria-expanded", "false");
+    cacheButton.setAttribute("aria-controls", cacheNote.id);
+    this.notes.push({ button: cacheButton, note: cacheNote });
     this.confirm = element(
       "div",
       { class: "hunch-confirm", hidden: "" },
@@ -397,7 +437,7 @@ class SettingsPanel {
         element(
           "div",
           { class: "hunch-confirm-body", id: `${id}-confirm-body` },
-          "段落阈值、段内精确定位、句子阈值、聚光灯和外观都会恢复为默认值。",
+          "段落阈值、段内精确定位、句子阈值、聚光灯、缓存和外观都会恢复为默认值。",
         ),
         element("div", { class: "hunch-confirm-actions" }, this.confirmCancel, this.confirmOk),
       ),
@@ -481,6 +521,18 @@ class SettingsPanel {
         sentenceHelp.note,
       ),
       row("聚光灯", this.spotlight),
+      // A <div>, not <label>, for the same reason as the sentence row: the ? button is labelable.
+      element(
+        "div",
+        { class: "hunch-setting" },
+        element(
+          "span",
+          { class: "hunch-setting-label" },
+          element("span", { class: "hunch-setting-name" }, "缓存搜索结果", cacheButton),
+        ),
+        this.cache,
+      ),
+      cacheNote,
       element(
         "div",
         { class: "hunch-setting" },
@@ -532,19 +584,24 @@ class SettingsPanel {
     });
     this.refine.addEventListener("change", () => handlers.onRefine(this.refine.checked));
     this.spotlight.addEventListener("change", () => handlers.onSpotlight(this.spotlight.checked));
+    this.cache.addEventListener("change", () => handlers.onCache(this.cache.checked));
     this.sentence.addEventListener("input", () => {
       this.paintSentenceValue();
       handlers.onSentenceThreshold(Number(this.sentence.value));
     });
     for (const button of this.themeButtons) {
-      button.addEventListener("click", () => handlers.onTheme(button.dataset.value as Theme));
+      button.addEventListener("click", (event) => {
+        // detail is 0 for keyboard activation; reveal from the button then, not from (0, 0).
+        const origin = event.detail ? { x: event.clientX, y: event.clientY } : center(button);
+        handlers.onTheme(button.dataset.value as Theme, origin);
+      });
       button.addEventListener("keydown", (event) => {
         const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
         if (!step) return;
         event.preventDefault();
         const i = this.themeButtons.indexOf(button);
         const next = this.themeButtons[(i + step + this.themeButtons.length) % this.themeButtons.length]!;
-        handlers.onTheme(next.dataset.value as Theme);
+        handlers.onTheme(next.dataset.value as Theme, center(next));
         next.focus();
       });
     }
@@ -592,6 +649,9 @@ class SettingsPanel {
   setSpotlight(on: boolean) {
     this.spotlight.checked = on;
   }
+  setCache(on: boolean) {
+    this.cache.checked = on;
+  }
   setRefine(on: boolean) {
     this.refine.checked = on;
     this.sentence.disabled = !on;
@@ -604,8 +664,22 @@ class SettingsPanel {
   setTheme(theme: Theme) {
     for (const button of this.themeButtons) {
       const on = button.dataset.value === theme;
+      // Only a change pops the icon; restoring prefs on load stays still.
+      if (on && button.getAttribute("aria-checked") === "false") popIcon(button);
       button.setAttribute("aria-checked", String(on));
       button.tabIndex = on ? 0 : -1;
     }
   }
+}
+
+function center(el: HTMLElement) {
+  const rect = el.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+function popIcon(button: HTMLElement) {
+  button.classList.remove("hunch-pop");
+  // Restart the animation if the same option is picked again mid-pop.
+  void button.offsetWidth;
+  button.classList.add("hunch-pop");
+  button.addEventListener("animationend", () => button.classList.remove("hunch-pop"), { once: true });
 }

@@ -454,17 +454,22 @@ test('a finished search closes its port, so a later worker shutdown is not repor
   input.value = '证据'; input.dispatchEvent(new w.Event('input'));
   input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter' }));
   const [first] = ports;
+  const pending = () => w.document.querySelectorAll('.hunch-pending').length;
+  assert.ok(pending() > 0, 'blocks waiting for Jev are outlined on the page');
+  assert.ok(verdict().textContent.includes('Jev 判断中'), 'the status names the judging step');
   first.receive({ type: 'progress', scores: Object.fromEntries(first.req.blocks.map(b => [b.id, .9])), done: 1, total: 1, failed: 0, ms: 5 });
+  assert.equal(pending(), 0, 'scored blocks lose their pending outline');
   assert.ok(first.closed, 'the content script closes the port after the last batch');
   first.drop();
   assert.ok(!verdict().classList.contains('hunch-error'), 'a disconnect after the search finished is not an error');
-  assert.ok(verdict().textContent.includes('找到'));
+  assert.match(verdict().textContent, /个文字块中 \d+ 段符合，已按分数排序/);
 
   shadow.querySelector('.hunch-submit').click();
   const second = ports[1];
   const [scored, ...rest] = second.req.blocks;
   second.receive({ type: 'progress', scores: { [scored.id]: .9 }, done: 1, total: 2, failed: 0, ms: 5 });
   second.drop();
+  assert.equal(pending(), 0, 'a dropped search leaves no pending outlines behind');
   assert.ok(verdict().classList.contains('hunch-error'), 'a disconnect mid-search is reported');
   assert.ok(verdict().textContent.includes('重试'));
   const retry = shadow.querySelector('.hunch-retry');

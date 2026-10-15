@@ -3,10 +3,12 @@ import { FindBar, type Theme } from "./content/bar";
 import { captureSelection, extractBlocks, type PageBlock } from "./content/blocks";
 import { CopyButton } from "./content/copy-button";
 import { Dock } from "./content/dock";
-import { clearPaint, type Hit, markCurrent, paint, rankHits } from "./content/hits";
+import { clearPaint, ensureStyles, type Hit, markCurrent, paint, rankHits } from "./content/hits";
+import { clearPending, markPending, settlePending } from "./content/pipeline";
 import { ScopeFrame } from "./content/scope-frame";
 import { clearSentences, paintSentences, sentenceRanges } from "./content/sentence-marks";
 import { Spotlight } from "./content/spotlight";
+import { cacheEnabled, setCacheEnabled } from "./shared/cache";
 import {
   type BlockId,
   blockId,
@@ -31,6 +33,13 @@ import {
 } from "./shared/sentences";
 
 const THEME_ORDER: Theme[] = ["auto", "light", "dark"];
+// Matches the .hunch-theme-shift transition in ui.css, plus a frame of slack.
+const THEME_SHIFT_MS = 420;
+const THEME_REVEAL_MS = 620;
+// The reveal animates the view transition snapshots ourselves; these turn off the default cross-fade
+// so the old palette stays fully opaque until the circle passes over it.
+const THEME_REVEAL_CSS = `
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }`;
 const HEADING = /^H[1-6]$/;
 // Wait for a burst of DOM changes (infinite scroll, lazy sections) to settle before re-reading.
 const GROWTH_DEBOUNCE_MS = 800;
@@ -78,14 +87,16 @@ class Hunch {
     onThreshold: (threshold) => this.setPrefs({ threshold }),
     onRetry: () => this.retry(),
     onScopeVisible: () => this.setPrefs({ showScope: !this.prefs.showScope }),
-    onTheme: (theme) => this.setPrefs({ theme }),
+    onTheme: (theme, origin) => this.switchTheme(theme, origin),
     onRefine: (refine) => this.setPrefs({ refine }),
     onSpotlight: (spotlight) => this.setPrefs({ spotlight }),
     onSentenceThreshold: (sentenceThreshold) => this.setPrefs({ sentenceThreshold }),
+    onCache: (on) => this.setCache(on),
     // Everything adjustable in the settings panel; the scope outline toggle lives on the toolbar.
     onResetSettings: () => {
       const { showScope: _, ...defaults } = DEFAULT_PREFS;
       this.setPrefs(defaults);
+      this.setCache(true);
       this.bar.flash("已恢复默认设置。");
     },
   });
@@ -122,6 +133,8 @@ class Hunch {
   private failed: BlockId[] = [];
   private lastProgress: Progress | undefined;
   private growthTimer: number | undefined;
+  private readonly dock: HTMLElement;
+  private themeTimer: number | undefined;
   private warmedAt = 0;
   private readonly observer = new MutationObserver((records) => {
     if (records.some((record) => !this.host.contains(record.target))) this.scheduleGrowthCheck();
@@ -143,6 +156,7 @@ class Hunch {
     // Keep the search UI out of reach of the host page's scripts.
     this.shadow = this.host.attachShadow({ mode: "closed" });
     const dock = new Dock(this.bar.root);
+    this.dock = dock.root;
     this.bar.root.prepend(dock.grabber);
     // After the bar in the DOM (and in tab order); CSS order places it above.
     dock.root.append(this.bar.panel);
@@ -207,7 +221,13 @@ class Hunch {
     this.abort();
     this.reset();
   }
+  // Stored apart from the UI prefs: the background reads it before every search.
+  private setCache(on: boolean) {
+    this.bar.setCache(on);
+    void setCacheEnabled(on).catch(() => {});
+  }
   private async loadPrefs() {
+    this.bar.setCache(await cacheEnabled().catch(() => true));
     try {
       const stored = (await browser.storage?.local.get("ui")) as { ui?: Partial<UiPrefs> } | undefined;
       const ui = stored?.ui;
@@ -243,10 +263,83 @@ class Hunch {
     else if (resentence) this.refineTop();
     this.paintScope();
   }
+  // A picked appearance washes over the UI in a circle from the clicked button. The snapshot is of the
+  // whole page (not just the host) so the bar's backdrop blur stays real mid-reveal. Anything that
+  // can't do it (no View Transitions, page CSP, reduced motion) falls back to applyTheme's cross-fade.
+  private switchTheme(theme: Theme, origin: { x: number; y: number }) {
+    const from = this.host.dataset.theme;
+    const to = theme === "auto" ? (pageTheme() === "light" ? "dark" : "light") : theme;
+    if (
+      from === to ||
+      !this.isOpen ||
+      typeof document.startViewTransition !== "function" ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return this.setPrefs({ theme });
+    let sheet: CSSStyleSheet | undefined;
+    try {
+      sheet = new CSSStyleSheet();
+      sheet.replaceSync(THEME_REVEAL_CSS);
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    } catch {
+      this.dropRevealSheet(sheet);
+      return this.setPrefs({ theme });
+    }
+    // Reach the farthest corner of the dock and settings panel, so the circle ends as it covers the UI.
+    const radius = Math.max(
+      ...[this.dock, this.bar.panel]
+        .map((el) => el.getBoundingClientRect())
+        .filter((rect) => rect.width && rect.height)
+        .flatMap((rect) => [
+          Math.hypot(rect.left - origin.x, rect.top - origin.y),
+          Math.hypot(rect.right - origin.x, rect.top - origin.y),
+          Math.hypot(rect.left - origin.x, rect.bottom - origin.y),
+          Math.hypot(rect.right - origin.x, rect.bottom - origin.y),
+        ]),
+      0,
+    );
+    let transition: ViewTransition;
+    try {
+      transition = document.startViewTransition(() => {
+        // Set the palette first so applyTheme sees no change and skips its own cross-fade.
+        this.host.dataset.theme = to;
+        this.setPrefs({ theme });
+      });
+    } catch {
+      this.dropRevealSheet(sheet);
+      return this.setPrefs({ theme });
+    }
+    transition.ready
+      .then(() => {
+        const at = `at ${origin.x}px ${origin.y}px`;
+        document.documentElement.animate(
+          { clipPath: [`circle(0 ${at})`, `circle(${radius + 24}px ${at})`] },
+          {
+            duration: THEME_REVEAL_MS,
+            easing: "cubic-bezier(0.65, 0, 0.35, 1)",
+            pseudoElement: "::view-transition-new(root)",
+          },
+        );
+      })
+      .catch(() => {});
+    transition.finished.finally(() => this.dropRevealSheet(sheet)).catch(() => {});
+  }
+  private dropRevealSheet(sheet: CSSStyleSheet | undefined) {
+    if (sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
+  }
   // 自动 contrasts with the page, not the system: a light site gets the dark bar so it stands off the content.
   private applyTheme() {
-    this.host.dataset.theme =
-      this.prefs.theme === "auto" ? (pageTheme() === "light" ? "dark" : "light") : this.prefs.theme;
+    const theme = this.prefs.theme === "auto" ? (pageTheme() === "light" ? "dark" : "light") : this.prefs.theme;
+    if (this.host.dataset.theme === theme) return;
+    // Cross-fade colors only for a visible switch; the first paint and reopen should land instantly.
+    if (this.isOpen && this.host.dataset.theme) {
+      this.host.classList.add("hunch-theme-shift");
+      // Commit the old colors as the transition start before the palette flips.
+      void this.host.offsetWidth;
+      window.clearTimeout(this.themeTimer);
+      this.themeTimer = window.setTimeout(() => this.host.classList.remove("hunch-theme-shift"), THEME_SHIFT_MS);
+    }
+    this.host.dataset.theme = theme;
   }
   // Outlines the search range for as long as the bottom bar is up. The article container is looked up
   // again only when `refresh` is set (scope switch, page change); typing just reuses it.
@@ -256,6 +349,7 @@ class Hunch {
   }
   private reset() {
     clearPaint();
+    clearPending();
     clearSentences();
     this.refined.clear();
     this.generation++;
@@ -333,7 +427,12 @@ class Hunch {
     this.sent = blocks.map((block) => block.id);
     this.setFailed([]);
     this.searching = true;
-    this.bar.set({ verdict: { text: "正在搜索…", tone: "busy" }, progress: { done: 0, total: 1 } });
+    const ids = new Set(this.sent);
+    markPending(
+      this.blocks.filter((block) => ids.has(block.id)),
+      ensureStyles,
+    );
+    this.bar.set({ verdict: { text: this.judging(0), tone: "busy" }, progress: { done: 0, total: 1 } });
     try {
       const port = browser.runtime.connect({ name: SEARCH_PORT });
       this.port = port;
@@ -368,6 +467,7 @@ class Hunch {
   // Closes the port of the current search. Leaving it open after the last batch let Chrome
   // cut it when the idle service worker stopped, which surfaced as a bogus "disconnected" error.
   private finish() {
+    clearPending();
     clearInterval(this.keepalive);
     this.keepalive = undefined;
     const port = this.port;
@@ -519,6 +619,7 @@ class Hunch {
     }
     this.scores = { ...this.base.scores, ...event.scores };
     this.conditionScores = { ...this.base.conditionScores, ...event.conditionScores };
+    settlePending(this.scores);
     const finished = event.done === event.total;
     if (finished) {
       this.finish();
@@ -533,7 +634,7 @@ class Hunch {
     const finished = progress.done === progress.total;
     const count = this.hits.length;
     const text = !finished
-      ? "正在搜索…"
+      ? this.judging(Object.keys(progress.scores).length)
       : progress.failed
         ? `${
             progress.failed === progress.total
@@ -541,7 +642,7 @@ class Hunch {
               : `${progress.failed}/${progress.total} 批搜索失败，已找到 ${count} 段`
           }：${(progress.error ?? "未知错误").replace(/[。.]$/, "")}。可点“重试”。`
         : count
-          ? `找到 ${count} 段相关原文`
+          ? `${this.blocks.length} 个文字块中 ${count} 段符合，已按分数排序`
           : "没有高相关结果";
     return {
       verdict: { text, tone: !finished ? "busy" : progress.failed ? "error" : count ? "found" : "absent" },
@@ -549,6 +650,11 @@ class Hunch {
       progress: { done: progress.done, total: progress.total },
       counter: this.counterText(),
     } as const;
+  }
+  // Names the step the search is in, so the status reads like the pipeline: blocks cut, Jev judging.
+  private judging(scored: number) {
+    const sent = this.sent.length;
+    return `已分成 ${this.blocks.length} 个文字块 · Jev 判断中 ${Math.min(scored, sent)}/${sent}`;
   }
   private counterText() {
     if (!this.hits.length) return "";

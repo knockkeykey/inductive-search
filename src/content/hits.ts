@@ -24,7 +24,7 @@ const painted = new Set<HTMLElement>();
 const styled = new WeakSet<Node>();
 
 // content.css is only inserted into the top document; give other roots their own copy.
-function ensureStyles(el: HTMLElement) {
+export function ensureStyles(el: HTMLElement) {
   const root = el.getRootNode();
   if (root === document || styled.has(root)) return;
   const target = root.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root : (root as Document).head;
@@ -39,8 +39,8 @@ function ensureStyles(el: HTMLElement) {
 
 export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
   clearPaint();
-  for (const { el, p, conditionScores } of hits) {
-    if (painted.has(el)) continue;
+  hits.forEach(({ el, p, conditionScores }, i) => {
+    if (painted.has(el)) return;
     painted.add(el);
     ensureStyles(el);
     applyTone(el);
@@ -51,13 +51,20 @@ export function paint(hits: readonly Hit[], threshold = THRESHOLD) {
     // Keyword-only hits sit below the threshold; give them the lightest wash. Still well below the
     // sentence marks' saturation so those carry the emphasis.
     const strength = Math.max(0, (p - threshold) / (1 - threshold));
-    el.style.setProperty("--hunch-alpha", (0.2 + 0.4 * strength).toFixed(3));
+    el.style.setProperty("--hunch-alpha", (0.28 + 0.36 * strength).toFixed(3));
     el.dataset.hunchP = p.toFixed(2);
     // Condition mode: tint by the strongest condition, matching that condition's badge in the bar.
     // Purely visual; the score and order above come from the combined p.
     const cond = strongest(conditionScores);
     if (cond >= 0) el.dataset.hunchCond = String(cond + 1);
-  }
+    // The badge spells out rank, colour source and score, so a glance (or a screen recording)
+    // reads "第 1 名 · 条件 2 · 相关度 0.92" without knowing the UI.
+    el.dataset.hunchBadge = badgeText(i + 1, cond, p);
+  });
+}
+
+export function badgeText(rank: number, cond: number, p: number): string {
+  return `#${rank} · ${cond >= 0 ? `条件${cond + 1} ` : "相关度 "}${p.toFixed(2)}`;
 }
 
 // Index of the highest score, or -1 when there are no per-condition scores (semantic mode).
@@ -73,6 +80,7 @@ export function clearPaint() {
     clearTone(el);
     el.style.removeProperty("--hunch-alpha");
     delete el.dataset.hunchP;
+    delete el.dataset.hunchBadge;
     delete el.dataset.hunchCond;
   }
   painted.clear();

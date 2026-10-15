@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import { answer, refine } from "./background/answer";
 import { PROVIDERS } from "./shared/api";
+import { cacheEnabled } from "./shared/cache";
 import { documentKind, VIEWER_PAGE, viewerQuery } from "./shared/documents";
 import { hasContentScript, injectContentScript, sendToTab } from "./shared/inject";
 import { type Refine, type RefineResult, SEARCH_PORT, type Search, type SearchEvent } from "./shared/protocol";
@@ -121,7 +122,7 @@ browser.runtime.onMessage.addListener((message: unknown): Promise<RefineResult |
   return (async () => {
     const { settings, allowed } = await loadAccess();
     if (!allowed) return { scores: {} };
-    return refine(message as Refine, settings);
+    return refine(message as Refine, settings, undefined, await cacheEnabled().catch(() => false));
   })().catch(() => ({ scores: {} }));
 });
 
@@ -152,7 +153,7 @@ browser.runtime.onConnect.addListener((port) => {
           message: `感应式查找需要访问 ${PROVIDERS[settings.provider].name}。请在设置页面点击“保存”并允许访问，然后重试搜索。`,
         });
       }
-      await answer(req, settings, abort.signal, emit);
+      await answer(req, settings, abort.signal, emit, await cacheEnabled().catch(() => false));
     } catch (e) {
       emit({ type: "failure", message: e instanceof Error ? e.message : String(e) });
     }

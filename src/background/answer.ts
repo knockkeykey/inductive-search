@@ -1,6 +1,14 @@
 import type { NoulResponse } from "@typesafe-ai/sdk";
 import { createClient, describeError, PROVIDERS } from "../shared/api";
 import {
+  type CachedSearch,
+  type CachedSentences,
+  paragraphKey,
+  readCache,
+  searchKey,
+  writeCache,
+} from "../shared/cache";
+import {
   type Block,
   type BlockId,
   type Progress,
@@ -24,16 +32,34 @@ import {
 } from "../shared/questions";
 import type { Settings } from "../shared/settings";
 
+// Cache failures never fail a search: it just runs without the cache.
+const quietly = <T>(work: () => Promise<T>) => work().catch(() => undefined);
+
 export async function answer(
   req: Search,
   settings: Settings,
   signal: AbortSignal,
   emit: (p: Progress) => void,
+  cache = false,
 ): Promise<void> {
   const client = createClient(settings);
   const conditions = req.mode === "conditions" ? (req.conditions ?? []) : [];
   if (req.mode === "conditions" && (!conditions.length || conditions.length > MAX_CONDITIONS)) {
     throw new Error(`请输入 1 至 ${MAX_CONDITIONS} 个条件。`);
+  }
+  const cacheStarted = performance.now();
+  const key = cache ? await quietly(() => searchKey(req, settings)) : undefined;
+  const cached = key ? await quietly(() => readCache<CachedSearch>(key)) : undefined;
+  if (cached) {
+    return emit({
+      type: "progress",
+      scores: cached.scores,
+      done: cached.total,
+      total: cached.total,
+      failed: 0,
+      ms: Math.round(performance.now() - cacheStarted),
+      ...(cached.conditionScores ? { conditionScores: cached.conditionScores } : {}),
+    });
   }
   // OpenLux lists a 32k-token context. Leave more room for the per-block questions.
   const budget =
@@ -118,20 +144,41 @@ export async function answer(
   if (!signal.aborted && failed === chunks.length) {
     throw new Error(firstError ?? "所有搜索请求均失败。");
   }
+  // Only complete searches are cached; a partial one would hide the 重试 button next time.
+  if (key && !signal.aborted && failed === 0) {
+    const value: CachedSearch = {
+      scores,
+      total: chunks.length,
+      ...(conditions.length ? { conditionScores } : {}),
+    };
+    await quietly(() => writeCache([{ key, value }]));
+  }
 }
 
 // Scores each sentence of the top hits. One message carries them all, but every paragraph is still
 // its own request: the paragraph alone is the page text, so a sentence is judged only with its own
 // neighbours as context. A failed or invalid paragraph gets no scores: its paragraph result stands.
-export async function refine(req: Refine, settings: Settings, signal?: AbortSignal): Promise<RefineResult> {
+export async function refine(
+  req: Refine,
+  settings: Settings,
+  signal?: AbortSignal,
+  cache = false,
+): Promise<RefineResult> {
   const paragraphs = req.paragraphs.filter((p) => p.sentences.length);
   if (!paragraphs.length) return { scores: {} };
   const client = createClient(settings);
   const conditions = req.conditions ?? [];
   const scores: RefineResult["scores"] = {};
+  const fresh: { key: string; value: CachedSentences }[] = [];
   await Promise.all(
     paragraphs.map(async (p) => {
       const ids = p.sentences.map((s) => s.id);
+      const key = cache ? await quietly(() => paragraphKey(req, p, settings)) : undefined;
+      const cached = key ? await quietly(() => readCache<CachedSentences>(key)) : undefined;
+      if (cached) {
+        scores[p.id] = cached;
+        return;
+      }
       try {
         const result = await client.systemOne(
           {
@@ -166,9 +213,11 @@ export async function refine(req: Refine, settings: Settings, signal?: AbortSign
           values[id] = conditions.length ? combineConditions(sentence, req.combination ?? "all") : sentence[0]!;
         }
         scores[p.id] = values;
+        if (key) fresh.push({ key, value: values });
       } catch {}
     }),
   );
+  await quietly(() => writeCache(fresh));
   return { scores };
 }
 

@@ -4,6 +4,7 @@ import { FindBar } from "../src/content/bar";
 import { CopyButton } from "../src/content/copy-button";
 import { Dock } from "../src/content/dock";
 import type { Hit } from "../src/content/hits";
+import { clearPending, markPending } from "../src/content/pipeline";
 import { ScopeFrame } from "../src/content/scope-frame";
 import { applyTone } from "../src/content/tone";
 
@@ -63,11 +64,22 @@ const hits = paragraphs.slice(0, 3).map(
 
 const states: Record<string, () => void> = {
   results() {
+    clearPending();
     bar.set({
       counter: "1 / 3",
-      verdict: { text: "找到 3 处高相关结果", tone: "found" },
+      verdict: { text: "6 个文字块中 3 段符合，已按分数排序", tone: "found" },
       meta: "1317 毫秒 · 1/1 批次",
       progress: { done: 1, total: 1 },
+    });
+  },
+  // Mid-search: the last two blocks are still dashed (waiting for Jev), the first three are scored.
+  judging() {
+    markPending(paragraphs.slice(3).map((el, i) => ({ id: `b${i + 4}`, el, text: "", heading: "" }) as never));
+    bar.set({
+      counter: "",
+      verdict: { text: "已分成 6 个文字块 · Jev 判断中 4/6", tone: "busy" },
+      meta: "640 毫秒 · 1/2 批次",
+      progress: { done: 1, total: 2 },
     });
   },
   busy() {
@@ -113,6 +125,7 @@ for (const hit of hits) {
   applyTone(hit.el);
   hit.el.classList.add("hunch-hl", "hunch-rel");
   hit.el.dataset.hunchP = hit.p.toFixed(2);
+  hit.el.dataset.hunchBadge = `#${hits.indexOf(hit) + 1} · 相关度 ${hit.p.toFixed(2)}`;
   hit.el.style.setProperty("--hunch-alpha", (0.05 + 0.05 * hit.p).toFixed(3));
 }
 copyButton.update(hits, hits[0]);

@@ -1,5 +1,5 @@
 {
-  description = "感应式查找：按问题和条件定位网页文字，基于 Hunch";
+  description = "感应式查找：按问题和条件定位网页文字";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   outputs = { self, nixpkgs }:
     let

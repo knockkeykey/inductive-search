@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "感应式查找",
   "version": "1.1.0",
-  "description": "按问题或按条件查找网页原文，并在网页上高亮结果。基于 Hunch。",
+  "description": "按问题或按条件查找网页原文，并在网页上高亮结果。",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

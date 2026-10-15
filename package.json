@@ -2,7 +2,7 @@
   "name": "inductive-search",
   "version": "1.1.0",
   "private": true,
-  "description": "感应式查找：按问题或条件定位网页原文并高亮结果。基于 Hunch。",
+  "description": "感应式查找：按问题或条件定位网页原文并高亮结果。",
   "author": "tymscar",
   "license": "MIT",
   "repository": {

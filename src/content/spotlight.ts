@@ -32,7 +32,7 @@ export class Spotlight {
     this.target = el;
     el.classList.add(SPOT);
     this.root.classList.toggle("hunch-spotlight-dark", isDark(el));
-    this.score.textContent = el.dataset.hunchP ?? "";
+    this.score.textContent = el.dataset.hunchBadge ?? el.dataset.hunchP ?? "";
     this.score.hidden = !this.score.textContent;
     this.root.hidden = false;
     this.layout();
