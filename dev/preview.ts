@@ -35,6 +35,8 @@ const bar = new FindBar({
   onRefine: (on) => bar.setRefine(on),
   onSentenceThreshold: noop,
   onResetSettings: noop,
+  onSettingsShown: () => bar.setProvider({ name: "relay.example.com", state: "ready" }),
+  onEditProvider: noop,
   onTheme: (theme) => {
     if (theme === "auto") delete host.dataset.theme;
     else host.dataset.theme = theme;

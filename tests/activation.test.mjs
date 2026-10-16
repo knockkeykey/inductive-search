@@ -38,7 +38,7 @@ await build({
             },
             storage: { local: { get: async () => {
               state.events.push("storage");
-              return { settings: { provider: "openlux", profiles: { openlux: { apiKey: "dummy-key", model: "jev-1.13.0" } } } };
+              return { settings: { provider: "custom", profiles: { custom: { apiKey: "dummy-key", model: "jev-1.13.0", baseURL: "https://relay.example.com" } } } };
             } }, onChanged: event("storage-change") },
             permissions: {
               onAdded: event("permission-added"), onRemoved: event("permission-removed"),
@@ -107,7 +107,7 @@ test("search without provider permission opens settings and explains how to reco
   await new Promise(resolve => setImmediate(resolve));
   assert.ok(globalThis.hunchActivation.events.includes("options"));
   assert.equal(messages.at(-1).type, "failure");
-  assert.match(messages.at(-1).message, /OpenLux.*设置.*保存/);
+  assert.match(messages.at(-1).message, /relay\.example\.com.*设置.*保存/);
 });
 
 test("the content script is injected on demand instead of into every page", () => {

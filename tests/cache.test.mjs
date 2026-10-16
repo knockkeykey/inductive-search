@@ -43,7 +43,7 @@ beforeEach(() => {
   globalThis.hunchCacheStorage = {};
 });
 
-const settings = { ...defaultSettings("openlux"), apiKey: "dummy-test-key" };
+const settings = { ...defaultSettings("custom"), apiKey: "dummy-test-key", model: "jev-1.13.0", baseURL: "https://relay.example.com" };
 const search = {
   url: "https://example.com/article#top",
   title: "Example",
@@ -94,6 +94,7 @@ test("a changed page, question, model or a disabled cache misses", async () => {
     [{ ...search, url: "https://example.com/other" }, settings],
     [{ ...search, query: "有什么缺点" }, settings],
     [search, { ...settings, model: "jev-1.13.0:stable" }],
+    [search, { ...settings, baseURL: "https://other-relay.example.com" }],
     [{ ...search, mode: "conditions", conditions: ["有什么优点"] }, settings],
   ]) {
     mockFetch();

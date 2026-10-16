@@ -46,7 +46,11 @@ const question = (req: Pick<Search, "query" | "mode" | "conditions" | "combinati
     ? { conditions: (req.conditions ?? []).map(normalizeQuery), combination: req.combination ?? "all" }
     : { query: normalizeQuery(req.query) };
 
-const model = (settings: Settings) => ({ provider: settings.provider, model: settings.model });
+const model = (settings: Settings) => ({
+  provider: settings.provider,
+  model: settings.model,
+  ...(settings.baseURL ? { baseURL: settings.baseURL } : {}),
+});
 
 export const searchKey = (req: Search, settings: Settings) =>
   hash({

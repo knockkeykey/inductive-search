@@ -1,9 +1,10 @@
 import browser from "webextension-polyfill";
 import { answer, refine } from "./background/answer";
-import { PROVIDERS } from "./shared/api";
+import { baseURLOf, providerName } from "./shared/api";
 import { cacheEnabled } from "./shared/cache";
 import { documentKind, VIEWER_PAGE, viewerQuery } from "./shared/documents";
 import { hasContentScript, injectContentScript, sendToTab } from "./shared/inject";
+import type { ProviderStatus } from "./shared/protocol";
 import { type Refine, type RefineResult, SEARCH_PORT, type Search, type SearchEvent } from "./shared/protocol";
 import { hasApiAccess, loadSettings, type Settings } from "./shared/settings";
 
@@ -17,7 +18,7 @@ let access: Promise<Access> | undefined;
 const loadAccess = () => {
   access ??= (async () => {
     const settings = await loadSettings();
-    return { settings, allowed: Boolean(settings.apiKey) && (await hasApiAccess(settings.provider)) };
+    return { settings, allowed: Boolean(settings.apiKey) && (await hasApiAccess(settings)) };
   })();
   // A failed read is not cached.
   access.catch(() => {
@@ -42,7 +43,7 @@ async function warm() {
   const { settings, allowed } = await loadAccess();
   if (!allowed || Date.now() - warmedAt < WARM_INTERVAL_MS) return;
   warmedAt = Date.now();
-  await fetch(PROVIDERS[settings.provider].baseURL, {
+  await fetch(baseURLOf(settings), {
     method: "HEAD",
     cache: "no-store",
     signal: AbortSignal.timeout(5_000),
@@ -109,22 +110,34 @@ browser.action.onClicked.addListener(async (tab) => {
 });
 
 // Sentence scores for the top hits. Never throws: without them the paragraph highlights stay as they are.
-browser.runtime.onMessage.addListener((message: unknown): Promise<RefineResult | undefined> | undefined => {
-  const type = (message as { type?: string })?.type;
-  // The content script sends this when the bar opens, so the worker is awake and the
-  // connection is ready by the time the user submits.
-  if (type === "warm")
-    return warm().then(
-      () => undefined,
-      () => undefined,
-    );
-  if (type !== "refine") return undefined;
-  return (async () => {
-    const { settings, allowed } = await loadAccess();
-    if (!allowed) return { scores: {} };
-    return refine(message as Refine, settings, undefined, await cacheEnabled().catch(() => false));
-  })().catch(() => ({ scores: {} }));
-});
+browser.runtime.onMessage.addListener(
+  (message: unknown): Promise<RefineResult | ProviderStatus | undefined> | undefined => {
+    const type = (message as { type?: string })?.type;
+    // The content script sends this when the bar opens, so the worker is awake and the
+    // connection is ready by the time the user submits.
+    if (type === "warm")
+      return warm().then(
+        () => undefined,
+        () => undefined,
+      );
+    // The settings panel shows which provider is in use. The key itself never leaves the background.
+    if (type === "provider-status")
+      return loadAccess().then(
+        ({ settings, allowed }): ProviderStatus => ({
+          name: providerName(settings),
+          state: !settings.apiKey ? "nokey" : allowed ? "ready" : "denied",
+        }),
+      );
+    // Content scripts can't open the options page themselves.
+    if (type === "open-options") return browser.runtime.openOptionsPage().then(() => undefined);
+    if (type !== "refine") return undefined;
+    return (async () => {
+      const { settings, allowed } = await loadAccess();
+      if (!allowed) return { scores: {} };
+      return refine(message as Refine, settings, undefined, await cacheEnabled().catch(() => false));
+    })().catch(() => ({ scores: {} }));
+  },
+);
 
 browser.runtime.onConnect.addListener((port) => {
   if (port.name !== SEARCH_PORT) return;
@@ -150,7 +163,7 @@ browser.runtime.onConnect.addListener((port) => {
         void browser.runtime.openOptionsPage();
         return emit({
           type: "failure",
-          message: `感应式查找需要访问 ${PROVIDERS[settings.provider].name}。请在设置页面点击“保存”并允许访问，然后重试搜索。`,
+          message: `感应式查找需要访问 ${providerName(settings)}。请在设置页面点击“保存”并允许访问，然后重试搜索。`,
         });
       }
       await answer(req, settings, abort.signal, emit, await cacheEnabled().catch(() => false));

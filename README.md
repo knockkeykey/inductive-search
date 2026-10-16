@@ -45,11 +45,15 @@ npm run build
 | --- | --- | --- |
 | TypeSafe | [TypeSafe 控制台](https://console.typesafe.ai/keys) | **jev-latest** |
 | OpenRouter | [OpenRouter 密钥设置](https://openrouter.ai/settings/keys) | **~typesafe/jev-latest** |
-| OpenLux | [OpenLux 控制台](https://www.openlux.ai/login) | **jev-1.13.0** |
+| 自定义中转站 | 由你使用的中转站提供 | 无，需按中转站提供的模型名选择或填写 |
 
-模型菜单会提供该服务商支持的 Jev 模型。OpenRouter 还可选择 **typesafe/jev-1.13**。OpenLux 的 **jev-1.13.0:stable** 路由名是否可用取决于账号权限。
+模型菜单会提供该服务商支持的 Jev 模型。OpenRouter 还可选择 **typesafe/jev-1.13**。
 
-这些服务商使用 Jev 的 System One 决策接口。GPT、Claude 等普通聊天模型不能直接替代 Jev。搜索只会发送到你当前选择的服务商。
+选择“自定义中转站”时，需要填写中转站地址（根地址即可，例如 `https://api.example.com`）、该中转站的 API Key 和模型名。扩展会向 `{地址}/v1/systemone` 发送请求；如果中转站提供 `/v1/models`，设置页会把其中的 Jev 模型列成菜单，默认选中第一个，菜单最后的“手动输入…”可填写列表里没有的模型名；读取不到列表时直接填写模型名。不同中转站的模型名可能不同，例如有的不提供 `jev-latest`，请以中转站的说明为准。保存时浏览器会请求访问该地址的权限。填好后可以点“测试连接”：它用当前填写的内容（不必先保存）发送一次只含示例文字的请求，并显示是否连通、实际响应的模型和耗时；失败时显示服务商返回的原始错误。这是一次真实请求，可能按用量计费。
+
+这些服务商都使用 Jev 的 System One 决策接口。GPT、Claude 等普通聊天模型不能直接替代 Jev，只提供 OpenAI 兼容聊天接口的中转站也无法使用。搜索只会发送到你当前选择的服务商。
+
+在查找栏的设置面板里可以看到当前服务商和配置状态，点击“修改”会打开扩展设置页。API Key 只在扩展设置页填写，不会在网页里输入。
 
 ## 开始查找
 

@@ -982,6 +982,21 @@ textarea::placeholder {
   width: 13px;
   height: 13px;
 }
+.hunch-provider-value {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hunch-secondary-label);
+}
+.hunch-provider-value[data-warn] {
+  color: var(--hunch-red);
+}
+.hunch-provider-edit {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 12px;
+}
 .hunch-range {
   width: 120px;
   accent-color: var(--hunch-accent);

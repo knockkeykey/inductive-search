@@ -16,6 +16,7 @@
     }
   }
   * { box-sizing: border-box; }
+  label.row-item[hidden], input[hidden], select[hidden], span[hidden] { display: none; }
   body {
     font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased; background: var(--bg); color: var(--label);
@@ -47,18 +48,23 @@
   #save:hover:not(:disabled) { background: var(--accent-hover); filter: none; }
   .actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
   #saved { color: var(--green); }
+  #saved[data-error] { color: var(--orange); }
+  #testNote { margin-top: 8px; padding: 0; }
 </style></head>
 <body>
   <h1>感应式查找</h1>
   <p class="lede">仅当查找栏打开并提交搜索时，页面文字、网址、标题和搜索内容才会发送给你选择的服务商。</p>
-  <p id="nokey" style="display:none">首次搜索前需要 API 密钥。请前往 <a id="keyLink" href="https://console.typesafe.ai/keys" target="_blank" rel="noreferrer">TypeSafe 密钥</a>创建密钥，粘贴到下方并保存。</p>
+  <p id="nokey" style="display:none">首次搜索前需要 API 密钥。<span id="keyHint">请前往 <a id="keyLink" href="https://console.typesafe.ai/keys" target="_blank" rel="noreferrer">TypeSafe 密钥</a>创建密钥，</span>粘贴到下方并保存。</p>
   <div class="group">
-    <label class="row-item">API 服务商 <select id="provider" disabled><option value="typesafe">TypeSafe（官方）</option><option value="openrouter">OpenRouter（Jev）</option><option value="openlux">OpenLux（Jev）</option></select></label>
+    <label class="row-item">API 服务商 <select id="provider" disabled><option value="typesafe">TypeSafe（官方）</option><option value="openrouter">OpenRouter（Jev）</option><option value="custom">自定义中转站（兼容 Jev System One）</option></select></label>
+    <label class="row-item" id="baseURLRow" hidden><span>中转站地址 <small>填根地址即可，扩展会请求 /v1/systemone</small></span>
+      <input id="baseURL" type="url" placeholder="https://api.example.com" autocomplete="off" spellcheck="false"></label>
     <label class="row-item"><span id="keyLabel">TypeSafe API 密钥</span> <input id="apiKey" type="password" placeholder="apikey_…" autocomplete="off"></label>
-    <label class="row-item"><span>模型 <small id="modelNote"></small></span>
-      <select id="model"></select></label>
+    <label class="row-item" id="modelRow"><span>模型 <small id="modelNote"></small></span>
+      <select id="model"></select>
+      <input id="customModel" type="text" placeholder="例如 jev-1.13.0，以中转站提供的模型名为准" autocomplete="off" spellcheck="false" hidden></label>
   </div>
-  <small class="footnote">OpenRouter 和 OpenLux 使用 Jev 的 System One API，不支持 GPT、Claude 等聊天模型。每个服务商分别保存自己的密钥和模型。</small>
+  <small class="footnote">OpenRouter 和自定义中转站使用 Jev 的 System One API，不支持 GPT、Claude 等聊天模型。选择自定义中转站时，搜索内容会发送到你填写的地址。每个服务商分别保存自己的密钥和模型。</small>
   <div class="group">
     <label class="row-item"><span>快捷键 <small id="shortcutHint">点击此处并按下想设置的组合键。</small></span>
       <span class="row">
@@ -68,7 +74,8 @@
       <small id="shortcutNote"></small></label>
   </div>
   <small class="footnote">在 PDF 网页上按快捷键会自动用文档查看器打开。本地的 PDF、Word（.docx）文件可以<a href="viewer.html" target="_blank">在文档查看器中打开</a>。</small>
-  <div class="actions"><button id="save" type="button" disabled>保存</button><span id="saved"></span></div>
+  <div class="actions"><button id="save" type="button" disabled>保存</button><button id="test" type="button" disabled>测试连接</button><span id="saved"></span></div>
+  <small class="footnote" id="testNote">测试连接会用一段固定的示例文字向服务商发送一次真实请求（不含任何网页内容），可能按用量计费。测试使用当前填写的内容，不会自动保存。</small>
   <script src="options.js"></script>
 </body>
 </html>

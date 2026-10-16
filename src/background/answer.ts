@@ -1,5 +1,5 @@
 import type { NoulResponse } from "@typesafe-ai/sdk";
-import { createClient, describeError, PROVIDERS } from "../shared/api";
+import { createClient, describeError, providerName } from "../shared/api";
 import {
   type CachedSearch,
   type CachedSentences,
@@ -61,9 +61,9 @@ export async function answer(
       ...(cached.conditionScores ? { conditionScores: cached.conditionScores } : {}),
     });
   }
-  // OpenLux lists a 32k-token context. Leave more room for the per-block questions.
+  // A relay's context size is unknown; keep its batches small enough for a 32k-token model.
   const budget =
-    settings.provider === "openlux"
+    settings.provider === "custom"
       ? { chars: 12_000, blocks: 40 }
       : { chars: MAX_CHUNK_CHARS, blocks: MAX_CHUNK_BLOCKS };
   const chunks = chunkByBudget(req.blocks, {
@@ -121,7 +121,7 @@ export async function answer(
             a.noul < 0 ||
             a.noul > 1
           ) {
-            throw new Error(`${PROVIDERS[settings.provider].name} 返回了无效的 Jev 概率（${questionId}）。`);
+            throw new Error(`${providerName(settings)} 返回了无效的 Jev 概率（${questionId}）。`);
           }
           return a.noul;
         });
@@ -134,7 +134,7 @@ export async function answer(
       Object.assign(conditionScores, chunkConditions);
     } catch (error) {
       if (signal.aborted) return;
-      firstError ??= describeError(error, settings.provider);
+      firstError ??= describeError(error, settings);
       console.error("感应式查找 search batch failed:", error);
       failed++;
     }

@@ -1,4 +1,4 @@
-import type { Combination, SearchMode, SearchScope } from "../shared/protocol";
+import type { Combination, ProviderStatus, SearchMode, SearchScope } from "../shared/protocol";
 import { THRESHOLDS } from "../shared/ranking";
 import { SENTENCE_THRESHOLD_MAX, SENTENCE_THRESHOLD_MIN, SENTENCE_THRESHOLD_STEP } from "../shared/sentences";
 import { ConditionList } from "./condition-list";
@@ -35,6 +35,10 @@ export interface BarHandlers {
   onSentenceThreshold(value: number): void;
   onCache(on: boolean): void;
   onResetSettings(): void;
+  // The panel opened; refresh what it shows about the provider.
+  onSettingsShown(): void;
+  // The key is entered on the options page, never inside a web page.
+  onEditProvider(): void;
   onRetry(): void;
 }
 export interface Status {
@@ -295,6 +299,9 @@ export class FindBar {
   setCache(on: boolean) {
     this.settings.setCache(on);
   }
+  setProvider(status: ProviderStatus | undefined) {
+    this.settings.setProvider(status);
+  }
   // `count` new blocks appeared since the last search; 0 hides the chip.
   setPending(count: number) {
     this.refreshButton.hidden = !count;
@@ -399,6 +406,8 @@ class SettingsPanel {
       THEMES[theme].label,
     ),
   );
+  private readonly providerValue = element("span", { class: "hunch-provider-value" });
+  private readonly providerEdit = element("button", { type: "button", class: "hunch-provider-edit" }, "修改");
   private readonly helpButton = iconButton("question", "判断标准说明", "hunch-help-toggle");
   private readonly help: HTMLElement;
   private readonly resetButton = iconButton("reset", "恢复默认设置", "hunch-reset-toggle");
@@ -555,6 +564,13 @@ class SettingsPanel {
       element(
         "div",
         { class: "hunch-setting" },
+        element("span", { class: "hunch-setting-label" }, "服务商"),
+        this.providerValue,
+        this.providerEdit,
+      ),
+      element(
+        "div",
+        { class: "hunch-setting" },
         element(
           "span",
           { class: "hunch-setting-label" },
@@ -596,7 +612,12 @@ class SettingsPanel {
   }
 
   listen(handlers: BarHandlers) {
-    this.button.addEventListener("click", () => this.toggle(this.root.hidden));
+    this.button.addEventListener("click", () => {
+      const open = this.root.hidden;
+      this.toggle(open);
+      if (open) handlers.onSettingsShown();
+    });
+    this.providerEdit.addEventListener("click", () => handlers.onEditProvider());
     this.helpButton.addEventListener("click", () => {
       const open = this.help.hidden;
       this.help.hidden = !open;
@@ -711,6 +732,17 @@ class SettingsPanel {
   setSentenceThreshold(value: number) {
     this.sentence.value = String(value);
     this.paintSentenceValue();
+  }
+  setProvider(status: ProviderStatus | undefined) {
+    const state = status?.state;
+    const text = !status
+      ? "无法读取"
+      : state === "ready"
+        ? `${status.name} · 已配置`
+        : `${status.name} · ${state === "nokey" ? "未设置密钥" : "未授权访问"}`;
+    this.providerValue.textContent = text;
+    this.providerValue.toggleAttribute("data-warn", state !== "ready");
+    this.providerValue.title = text;
   }
   setTheme(theme: Theme) {
     for (const button of this.themeButtons) {

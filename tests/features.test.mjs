@@ -33,7 +33,7 @@ const widgetBundle = await build({ entryPoints: ['src/content.ts'], bundle: true
 const originalFetch = globalThis.fetch;
 after(async () => { globalThis.fetch = originalFetch; delete globalThis.hunchFeatureStorage; await rm(temp, { recursive: true, force: true }); });
 const json = body => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
-const settings = { provider: 'openlux', model: 'jev-1.13.0', apiKey: 'dummy-test-key' };
+const settings = { provider: 'custom', model: 'jev-1.13.0', apiKey: 'dummy-test-key', baseURL: 'https://relay.example.com' };
 const request = { url: 'https://example.com/article', title: 'Test', query: 'test', blocks: [{ id: 'B001', text: 'Test evidence.' }] };
 
 test('condition mode evaluates each condition and applies all/any without inventing a joint probability', async () => {

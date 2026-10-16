@@ -53,6 +53,12 @@ export type TabMessage = Toggle | Ping;
 
 export const SEARCH_PORT = "hunch-search";
 
+// What the settings panel shows about the provider; the API key stays in the background.
+export interface ProviderStatus {
+  name: string;
+  state: "ready" | "nokey" | "denied";
+}
+
 // Second pass inside the top hits: each sentence of each paragraph gets its own score.
 // Paragraphs are scored separately; the message only saves round trips to the background.
 export interface Refine {

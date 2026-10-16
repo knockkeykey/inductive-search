@@ -13,6 +13,7 @@ import {
   type BlockId,
   blockId,
   type Progress,
+  type ProviderStatus,
   type Refine,
   type RefineResult,
   SEARCH_PORT,
@@ -93,6 +94,12 @@ class Hunch {
     onSentenceThreshold: (sentenceThreshold) => this.setPrefs({ sentenceThreshold }),
     onCache: (on) => this.setCache(on),
     // Everything adjustable in the settings panel; the scope outline toggle lives on the toolbar.
+    onSettingsShown: () => void this.showProvider(),
+    onEditProvider: () => {
+      try {
+        void Promise.resolve(browser.runtime.sendMessage({ type: "open-options" })).catch(() => {});
+      } catch {}
+    },
     onResetSettings: () => {
       const { showScope: _, ...defaults } = DEFAULT_PREFS;
       this.setPrefs(defaults);
@@ -220,6 +227,13 @@ class Hunch {
     this.scopeFrame.hide();
     this.abort();
     this.reset();
+  }
+  private async showProvider() {
+    try {
+      this.bar.setProvider((await browser.runtime.sendMessage({ type: "provider-status" })) as ProviderStatus);
+    } catch {
+      this.bar.setProvider(undefined);
+    }
   }
   // Stored apart from the UI prefs: the background reads it before every search.
   private setCache(on: boolean) {

@@ -1,6 +1,18 @@
 import browser from "webextension-polyfill";
-import { defaultSettings, listModels, type ModelChoice, PROVIDERS, type Provider, type Settings } from "./shared/api";
-import { loadSettings, requestApiAccess, saveSettings } from "./shared/settings";
+import {
+  CUSTOM,
+  defaultSettings,
+  isBuiltin,
+  listModels,
+  type ModelChoice,
+  normalizeBaseURL,
+  PROVIDERS,
+  type Provider,
+  providerName,
+  type Settings,
+  testConnection,
+} from "./shared/api";
+import { loadSettings, releaseApiAccess, requestApiAccess, saveSettings } from "./shared/settings";
 import {
   canRebindShortcut,
   commandShortcutFromEvent,
@@ -17,35 +29,63 @@ const apiKey = field<HTMLInputElement>("apiKey");
 const provider = field<HTMLSelectElement>("provider");
 const keyLabel = field("keyLabel");
 const keyLink = field<HTMLAnchorElement>("keyLink");
+const keyHint = field("keyHint");
+const baseURL = field<HTMLInputElement>("baseURL");
+const baseURLRow = field("baseURLRow");
 const model = field<HTMLSelectElement>("model");
+// The relay's model: picked from its list when it reports one, otherwise typed in.
+const customModel = field<HTMLInputElement>("customModel");
+const MANUAL = "\u0000manual";
+let relayListed = false;
 const modelNote = field("modelNote");
 const banner = field("nokey");
 const saved = field("saved");
 const saveButton = field<HTMLButtonElement>("save");
+const testButton = field<HTMLButtonElement>("test");
 const drafts: Record<Provider, Settings> = {
   typesafe: defaultSettings("typesafe"),
   openrouter: defaultSettings("openrouter"),
-  openlux: defaultSettings("openlux"),
+  custom: defaultSettings("custom"),
 };
+// What the custom relay was saved with, so a changed address can give up the old host's access.
+let savedCustom = defaultSettings("custom");
 let activeProvider: Provider = "typesafe";
 let modelRevision = 0;
 
 function currentSettings(): Settings {
-  return { provider: activeProvider, apiKey: apiKey.value.trim(), model: model.value || drafts[activeProvider].model };
+  const key = apiKey.value.trim();
+  if (isBuiltin(activeProvider)) {
+    return { provider: activeProvider, apiKey: key, model: model.value || drafts[activeProvider].model };
+  }
+  const picked = relayListed && model.value !== MANUAL ? model.value : customModel.value;
+  return { provider: activeProvider, apiKey: key, model: picked.trim(), baseURL: baseURL.value.trim() };
 }
 
 function showProvider(s: Settings) {
   activeProvider = s.provider;
   provider.value = s.provider;
-  const config = PROVIDERS[s.provider];
-  keyLabel.textContent = `${config.name} API 密钥`;
-  keyLink.href = config.keyURL;
-  keyLink.textContent = `${config.name} 密钥`;
-  apiKey.placeholder = config.keyPlaceholder;
+  const builtin = isBuiltin(s.provider);
+  baseURLRow.hidden = builtin;
+  relayListed = false;
+  model.hidden = !builtin;
+  customModel.hidden = builtin;
+  keyHint.hidden = !builtin;
   apiKey.value = s.apiKey;
-  // Set a usable selection immediately, including when model discovery is offline.
-  model.replaceChildren(new Option(s.model, s.model, true, true));
   modelNote.textContent = "";
+  if (isBuiltin(s.provider)) {
+    const config = PROVIDERS[s.provider];
+    keyLabel.textContent = `${config.name} API 密钥`;
+    keyLink.href = config.keyURL;
+    keyLink.textContent = `${config.name} 密钥`;
+    apiKey.placeholder = config.keyPlaceholder;
+    // Set a usable selection immediately, including when model discovery is offline.
+    model.replaceChildren(new Option(s.model, s.model, true, true));
+  } else {
+    keyLabel.textContent = "中转站 API 密钥";
+    apiKey.placeholder = CUSTOM.keyPlaceholder;
+    baseURL.value = s.baseURL ?? "";
+    customModel.value = s.model;
+  }
   showKeyBanner(Boolean(s.apiKey));
   void loadModels(s);
 }
@@ -92,6 +132,27 @@ field("resetShortcut").addEventListener("click", async () => {
   await showShortcut("已恢复默认快捷键。");
 });
 
+// The relay's list as a menu, ending with 手动输入… for a name the list doesn't have. A model the
+// relay no longer lists, or none yet, gives way to the first Jev model it does list.
+function showRelayModels(models: ModelChoice[], current: string) {
+  model.replaceChildren(
+    ...models.map((m) => new Option(relayLabel(m), m.name, false, m.name === current)),
+    new Option("手动输入…", MANUAL),
+  );
+  if (!models.some((m) => m.name === current)) model.selectedIndex = 0;
+  relayListed = true;
+  model.hidden = false;
+  showManualModel();
+}
+function showManualModel() {
+  const manual = model.value === MANUAL;
+  customModel.hidden = !manual;
+  if (manual && !customModel.value) customModel.focus();
+}
+model.addEventListener("change", () => {
+  if (relayListed) showManualModel();
+});
+
 async function modelChoices(settings: Settings): Promise<{ models: ModelChoice[]; note: string }> {
   const current = { name: settings.model, description: "" };
   if (!settings.apiKey) return { models: [current], note: "保存 API 密钥后即可查看可用模型。" };
@@ -106,6 +167,7 @@ async function modelChoices(settings: Settings): Promise<{ models: ModelChoice[]
 
 async function loadModels(settings: Settings) {
   const revision = ++modelRevision;
+  if (!isBuiltin(settings.provider)) return loadRelayModels(settings, revision);
   const { models, note } = await modelChoices(settings);
   if (revision !== modelRevision) return;
   const selected = model.value;
@@ -113,12 +175,30 @@ async function loadModels(settings: Settings) {
   modelNote.textContent = note;
 }
 
+// Without a list from the relay, the typed-in name is used as is.
+async function loadRelayModels(settings: Settings, revision: number) {
+  if (!settings.apiKey || !settings.baseURL) {
+    modelNote.textContent = "填好地址和密钥并保存后，会尝试读取中转站的模型列表。";
+    return;
+  }
+  try {
+    const models = await listModels(settings);
+    if (revision !== modelRevision) return;
+    showRelayModels(models, settings.model);
+    modelNote.textContent = "";
+  } catch (e) {
+    if (revision !== modelRevision) return;
+    modelNote.textContent = `无法获取模型列表，请手动填写模型名。${e instanceof Error ? e.message : ""}`;
+  }
+}
+
 const LOCALIZED_MODEL_DESCRIPTIONS: Record<string, string> = {
-  "jev-1.13.0": "System One 决策模型",
-  "jev-1.13.0:stable": "稳定路由（模型页面示例）",
   "~typesafe/jev-latest": "最新 Jev",
   "typesafe/jev-1.13": "Jev 1.13",
 };
+// A relay's models show only what the relay itself reported, nothing added here.
+const relayLabel = (m: ModelChoice) =>
+  m.description && m.description !== m.name ? `${m.name}（${m.description}）` : m.name;
 const labelFor = (m: ModelChoice) => {
   const description = LOCALIZED_MODEL_DESCRIPTIONS[m.name];
   return description ? `${m.name}（${description}）` : m.name;
@@ -141,40 +221,94 @@ async function load() {
     }
   }
   shortcut.value = await shortcutLabel();
-  const [s, typesafe, openrouter, openlux] = await Promise.all([
+  const [s, typesafe, openrouter, custom] = await Promise.all([
     loadSettings(),
     loadSettings("typesafe"),
     loadSettings("openrouter"),
-    loadSettings("openlux"),
+    loadSettings("custom"),
   ]);
   drafts.typesafe = typesafe;
   drafts.openrouter = openrouter;
-  drafts.openlux = openlux;
+  drafts.custom = custom;
+  savedCustom = custom;
   showProvider(s);
-  provider.disabled = false;
-  saveButton.disabled = false;
+  setBusy(false);
 }
 
-async function save() {
+function setBusy(busy: boolean) {
+  saveButton.disabled = busy;
+  testButton.disabled = busy;
+  provider.disabled = busy;
+}
+
+function report(text: string, error = false) {
+  saved.textContent = text;
+  saved.toggleAttribute("data-error", error);
+}
+
+// What Save and Test both send: checked here, before anything awaits, so the permission prompt
+// that follows still counts as part of the click.
+function checkedSettings(): Settings {
   const s = currentSettings();
-  saveButton.disabled = true;
-  provider.disabled = true;
+  if (!s.apiKey) throw new Error("请填写 API 密钥。");
+  if (!isBuiltin(s.provider)) {
+    s.baseURL = normalizeBaseURL(s.baseURL ?? "");
+    baseURL.value = s.baseURL;
+  }
+  return s;
+}
+
+// A new relay has no model yet: take the first Jev model it lists, once access is granted.
+async function withModel(s: Settings): Promise<Settings> {
+  if (isBuiltin(s.provider) || s.model) return s;
+  const revision = ++modelRevision;
+  const models = await listModels(s).catch(() => []);
+  if (revision !== modelRevision || !models.length) throw new Error("请填写模型名。");
+  showRelayModels(models, "");
+  return { ...s, model: models[0]!.name };
+}
+
+// Tests what is filled in now, saved or not.
+async function test() {
+  setBusy(true);
   try {
-    if (!(await requestApiAccess(s.provider))) throw new Error(`未获准访问 ${PROVIDERS[s.provider].name}。`);
-    await saveSettings(s);
-    drafts[s.provider] = s;
-    showKeyBanner(Boolean(s.apiKey));
-    saved.textContent = "已保存";
-    void loadModels(s);
+    const checked = checkedSettings();
+    if (!(await requestApiAccess(checked))) throw new Error(`未获准访问 ${providerName(checked)}。`);
+    const s = await withModel(checked);
+    report("正在测试连接…");
+    const { model: answered, ms } = await testConnection(s, AbortSignal.timeout(20_000));
+    const unsaved = JSON.stringify(await loadSettings()) !== JSON.stringify(s);
+    report(`连接正常：${providerName(s)} · ${answered} · ${ms} 毫秒${unsaved ? "。点“保存”后生效" : ""}`);
   } catch (err) {
-    saved.textContent = err instanceof Error ? err.message : String(err);
+    report(`连接失败：${err instanceof Error ? err.message : String(err)}`, true);
   } finally {
-    saveButton.disabled = false;
-    provider.disabled = false;
+    setBusy(false);
   }
 }
 
-field("save").addEventListener("click", () => void save());
-void load().catch((err: unknown) => {
-  saved.textContent = err instanceof Error ? err.message : String(err);
-});
+async function save() {
+  setBusy(true);
+  try {
+    const checked = checkedSettings();
+    // The permission request has to come first, while the click still counts as a user gesture.
+    if (!(await requestApiAccess(checked))) throw new Error(`未获准访问 ${providerName(checked)}。`);
+    const s = await withModel(checked);
+    await saveSettings(s);
+    if (!isBuiltin(s.provider)) {
+      await releaseApiAccess(savedCustom, s);
+      savedCustom = s;
+    }
+    drafts[s.provider] = s;
+    showKeyBanner(Boolean(s.apiKey));
+    report("已保存");
+    void loadModels(s);
+  } catch (err) {
+    report(err instanceof Error ? err.message : String(err), true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+saveButton.addEventListener("click", () => void save());
+testButton.addEventListener("click", () => void test());
+void load().catch((err: unknown) => report(err instanceof Error ? err.message : String(err), true));
