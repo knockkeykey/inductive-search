@@ -20,6 +20,14 @@
 
 ## 安装
 
+### Chrome 预构建版
+
+[下载最新 Chrome 扩展包](https://github.com/knockkeykey/inductive-search/releases/latest/download/inductive-search-chrome.zip)，解压后打开 `chrome://extensions`，开启“开发者模式”，点击“加载已解压的扩展程序”，选择包含 `manifest.json` 的解压目录。
+
+Chrome 不支持在 Windows 和 macOS 上从 GitHub 直接拖入自托管的 `.crx` 安装包；这个 ZIP 需要按上述步骤加载。若要像 Chrome 商店扩展一样直接安装，需要先发布到 Chrome 网上应用店。
+
+### 从源码构建
+
 需要 Node.js 20.19+、22.13+ 或 24+。
 
 ~~~sh
