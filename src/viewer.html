@@ -30,8 +30,10 @@
   label.pick:focus-within { box-shadow: 0 0 0 3px var(--focus); }
   label.pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
   .theme { display: flex; padding: 2px; border-radius: 8px; background: var(--fill); }
-  .theme button { font: 12px/24px inherit; height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--label); cursor: pointer; }
-  .theme button[aria-checked="true"] { background: var(--selected); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+  .theme button { display: grid; place-items: center; width: 28px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--secondary); cursor: pointer; }
+  .theme button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .theme button:hover { color: var(--label); }
+  .theme button[aria-checked="true"] { background: var(--selected); box-shadow: 0 1px 3px rgba(0,0,0,.12); color: var(--label); }
   .theme button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
   #status { color: var(--secondary); font-size: 13px; min-height: 1.5em; margin: 0 0 16px; }
   #status.error { color: var(--orange); }
@@ -50,9 +52,9 @@
   <header>
     <h1 id="docTitle">打开 PDF 或 Word 文档</h1>
     <div class="theme" id="theme" role="radiogroup" aria-label="外观">
-      <button type="button" role="radio" data-value="auto">自动</button>
-      <button type="button" role="radio" data-value="light">浅色</button>
-      <button type="button" role="radio" data-value="dark">深色</button>
+      <button type="button" role="radio" aria-checked="false" data-value="auto" title="自动" aria-label="自动"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM10 3.5v13"/></svg></button>
+      <button type="button" role="radio" aria-checked="false" data-value="light" title="浅色" aria-label="浅色"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM10 2.5v1.5M10 16v1.5M2.5 10H4M16 10h1.5M4.7 4.7l1.06 1.06M14.24 14.24l1.06 1.06M4.7 15.3l1.06-1.06M14.24 5.76l1.06-1.06"/></svg></button>
+      <button type="button" role="radio" aria-checked="false" data-value="dark" title="深色" aria-label="深色"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 12.2A6.5 6.5 0 0 1 7.8 4a6.5 6.5 0 1 0 8.2 8.2z"/></svg></button>
     </div>
     <label class="pick">选择文件<input id="file" type="file"></label>
   </header>

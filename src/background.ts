@@ -130,6 +130,9 @@ browser.runtime.onMessage.addListener(
       );
     // Content scripts can't open the options page themselves.
     if (type === "open-options") return browser.runtime.openOptionsPage().then(() => undefined);
+    // Nor can they open the document viewer, an extension page.
+    if (type === "open-viewer")
+      return browser.tabs.create({ url: browser.runtime.getURL(VIEWER_PAGE) }).then(() => undefined);
     if (type !== "refine") return undefined;
     return (async () => {
       const { settings, allowed } = await loadAccess();

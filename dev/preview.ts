@@ -37,6 +37,7 @@ const bar = new FindBar({
   onResetSettings: noop,
   onSettingsShown: () => bar.setProvider({ name: "relay.example.com", state: "ready" }),
   onEditProvider: noop,
+  onOpenViewer: noop,
   onTheme: (theme) => {
     if (theme === "auto") delete host.dataset.theme;
     else host.dataset.theme = theme;

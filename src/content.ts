@@ -100,6 +100,11 @@ class Hunch {
         void Promise.resolve(browser.runtime.sendMessage({ type: "open-options" })).catch(() => {});
       } catch {}
     },
+    onOpenViewer: () => {
+      try {
+        void Promise.resolve(browser.runtime.sendMessage({ type: "open-viewer" })).catch(() => {});
+      } catch {}
+    },
     onResetSettings: () => {
       const { showScope: _, ...defaults } = DEFAULT_PREFS;
       this.setPrefs(defaults);

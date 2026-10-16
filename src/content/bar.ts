@@ -39,6 +39,8 @@ export interface BarHandlers {
   onSettingsShown(): void;
   // The key is entered on the options page, never inside a web page.
   onEditProvider(): void;
+  // Opens the extension's document viewer for local PDF / Word files.
+  onOpenViewer(): void;
   onRetry(): void;
 }
 export interface Status {
@@ -408,6 +410,7 @@ class SettingsPanel {
   );
   private readonly providerValue = element("span", { class: "hunch-provider-value" });
   private readonly providerEdit = element("button", { type: "button", class: "hunch-provider-edit" }, "修改");
+  private readonly viewerOpen = element("button", { type: "button", class: "hunch-provider-edit" }, "打开");
   private readonly helpButton = iconButton("question", "判断标准说明", "hunch-help-toggle");
   private readonly help: HTMLElement;
   private readonly resetButton = iconButton("reset", "恢复默认设置", "hunch-reset-toggle");
@@ -574,6 +577,17 @@ class SettingsPanel {
         element(
           "span",
           { class: "hunch-setting-label" },
+          element("span", { class: "hunch-setting-name" }, "文档查看器"),
+          element("span", { class: "hunch-setting-hint" }, "查找本地 PDF、Word 文件"),
+        ),
+        this.viewerOpen,
+      ),
+      element(
+        "div",
+        { class: "hunch-setting" },
+        element(
+          "span",
+          { class: "hunch-setting-label" },
           element("span", { class: "hunch-setting-name" }, "段落阈值", paragraphHelp.button),
         ),
         this.threshold,
@@ -618,6 +632,7 @@ class SettingsPanel {
       if (open) handlers.onSettingsShown();
     });
     this.providerEdit.addEventListener("click", () => handlers.onEditProvider());
+    this.viewerOpen.addEventListener("click", () => handlers.onOpenViewer());
     this.helpButton.addEventListener("click", () => {
       const open = this.help.hidden;
       this.help.hidden = !open;
