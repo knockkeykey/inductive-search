@@ -70,7 +70,7 @@ export class FindBar {
   ];
   private readonly mode = element(
     "div",
-    { class: "hunch-segmented", role: "radiogroup", "aria-label": "查找方式" },
+    { class: "hunch-segmented hunch-mode", role: "radiogroup", "aria-label": "查找方式" },
     ...this.modeButtons,
   );
   private modeValue: SearchMode = "semantic";
@@ -111,6 +111,8 @@ export class FindBar {
   );
   private readonly settings = new SettingsPanel();
   readonly panel = this.settings.root;
+  // In-flight mode-switch animations, cancelled when the user flips modes again mid-morph.
+  private morphs: Animation[] = [];
   private verdictState: NonNullable<Status["verdict"]> = { text: "", tone: "none" };
   private flashTimer: number | undefined;
 
@@ -169,7 +171,7 @@ export class FindBar {
     const pickMode = (value: SearchMode) => {
       if (value === this.modeValue) return;
       this.modeValue = value;
-      this.paintMode();
+      this.paintMode(true);
       handlers.onChange();
       this.focus();
     };
@@ -213,8 +215,14 @@ export class FindBar {
   focus() {
     (this.modeValue === "conditions" ? this.conditions : this.input).focus();
   }
-  private paintMode() {
+  private paintMode(animate = false) {
     const conditional = this.modeValue === "conditions";
+    const motion =
+      animate && typeof this.root.animate === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Measure mid-flight height before cancelling, so a quick re-toggle reverses smoothly.
+    const fromHeight = motion ? this.root.getBoundingClientRect().height : 0;
+    for (const running of this.morphs) running.cancel();
+    this.morphs = [];
     for (const button of this.modeButtons) {
       const on = button.dataset.value === this.modeValue;
       button.setAttribute("aria-checked", String(on));
@@ -224,7 +232,50 @@ export class FindBar {
     this.leading.hidden = conditional;
     this.input.hidden = conditional;
     this.conditions.root.hidden = !conditional;
+    if (!motion) {
+      this.combination.hidden = !conditional;
+      return;
+    }
+    this.combination.hidden = false;
+    const chipWidth = this.combination.getBoundingClientRect().width;
     this.combination.hidden = !conditional;
+    const toHeight = this.root.getBoundingClientRect().height;
+    const ease = "cubic-bezier(0.32, 0.72, 0, 1)";
+    // The dock is anchored at the bottom, so the bar grows upward and the result card rides along.
+    this.morphs.push(
+      this.root.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], { duration: 420, easing: ease }),
+    );
+    const entering = conditional
+      ? [...this.conditions.root.querySelectorAll<HTMLElement>(".hunch-condition-row, .hunch-condition-footer")]
+      : [this.leading, this.input];
+    entering.forEach((target, i) => {
+      this.morphs.push(
+        target.animate(
+          [
+            { opacity: 0, transform: `translateY(${conditional ? 8 : -6}px)`, filter: "blur(2px)" },
+            { opacity: 1, transform: "none", filter: "none" },
+          ],
+          { duration: 360, delay: 60 + i * 45, easing: ease, fill: "backwards" },
+        ),
+      );
+    });
+    // The combination chip opens and closes its own slot in the toolbar instead of popping.
+    const open = { width: `${chipWidth}px`, opacity: 1, transform: "none" };
+    const shut = {
+      width: "0px",
+      paddingLeft: "0px",
+      paddingRight: "0px",
+      marginLeft: "-6px",
+      opacity: 0,
+      transform: "scale(0.85)",
+    };
+    this.combination.hidden = false;
+    const chip = this.combination.animate(conditional ? [shut, open] : [open, shut], { duration: 320, easing: ease });
+    // Only the latest chip animation may settle visibility; a cancelled one is superseded.
+    chip.addEventListener("finish", () => {
+      this.combination.hidden = this.modeValue !== "conditions";
+    });
+    this.morphs.push(chip);
   }
   setScopeVisible(on: boolean) {
     this.scopeButton.setAttribute("aria-pressed", String(on));

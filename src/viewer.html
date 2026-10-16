@@ -5,17 +5,18 @@
 <style>
   :root {
     color-scheme: light dark;
-    --label: rgba(0,0,0,.88); --secondary: rgba(60,60,67,.62); --separator: rgba(60,60,67,.16);
-    --bg: #f5f5f7; --group: #fff; --fill: rgba(120,120,128,.12); --accent: #007aff; --orange: #c93400;
-    --focus: rgba(0,122,255,.4);
+    --label: light-dark(rgba(0,0,0,.88), rgba(255,255,255,.92));
+    --secondary: light-dark(rgba(60,60,67,.62), rgba(235,235,245,.6));
+    --separator: light-dark(rgba(60,60,67,.16), rgba(84,84,88,.6));
+    --bg: light-dark(#f5f5f7, #1c1c1e); --group: light-dark(#fff, #2c2c2e);
+    --fill: light-dark(rgba(120,120,128,.12), rgba(120,120,128,.24));
+    --accent: light-dark(#007aff, #0a84ff); --orange: light-dark(#c93400, #ff9f0a);
+    --focus: light-dark(rgba(0,122,255,.4), rgba(10,132,255,.6));
+    --selected: light-dark(#fff, #636366);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --label: rgba(255,255,255,.92); --secondary: rgba(235,235,245,.6); --separator: rgba(84,84,88,.6);
-      --bg: #1c1c1e; --group: #2c2c2e; --fill: rgba(120,120,128,.24); --accent: #0a84ff; --orange: #ff9f0a;
-      --focus: rgba(10,132,255,.6);
-    }
-  }
+  /* The header switch forces one side; "auto" keeps the system's. */
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
   * { box-sizing: border-box; }
   body {
     font: 15px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
@@ -28,6 +29,10 @@
   label.pick { font: 13px/28px inherit; height: 28px; padding: 0 14px; border-radius: 7px; background: var(--fill); cursor: pointer; }
   label.pick:focus-within { box-shadow: 0 0 0 3px var(--focus); }
   label.pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .theme { display: flex; padding: 2px; border-radius: 8px; background: var(--fill); }
+  .theme button { font: 12px/24px inherit; height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--label); cursor: pointer; }
+  .theme button[aria-checked="true"] { background: var(--selected); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+  .theme button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
   #status { color: var(--secondary); font-size: 13px; min-height: 1.5em; margin: 0 0 16px; }
   #status.error { color: var(--orange); }
   #grant { font: inherit; font-size: 13px; height: 28px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--accent); color: #fff; font-weight: 600; margin-bottom: 16px; }
@@ -44,6 +49,11 @@
 <body>
   <header>
     <h1 id="docTitle">打开 PDF 或 Word 文档</h1>
+    <div class="theme" id="theme" role="radiogroup" aria-label="外观">
+      <button type="button" role="radio" data-value="auto">自动</button>
+      <button type="button" role="radio" data-value="light">浅色</button>
+      <button type="button" role="radio" data-value="dark">深色</button>
+    </div>
     <label class="pick">选择文件<input id="file" type="file"></label>
   </header>
   <p id="status" role="status" aria-live="polite"></p>

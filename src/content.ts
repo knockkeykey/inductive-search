@@ -328,7 +328,7 @@ class Hunch {
     if (sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
   }
   // 自动 contrasts with the page, not the system: a light site gets the dark bar so it stands off the content.
-  private applyTheme() {
+  applyTheme() {
     const theme = this.prefs.theme === "auto" ? (pageTheme() === "light" ? "dark" : "light") : this.prefs.theme;
     if (this.host.dataset.theme === theme) return;
     // Cross-fade colors only for a visible switch; the first paint and reopen should land instantly.
@@ -756,6 +756,8 @@ if (!window.__hunchLoaded) {
       return true;
     });
     document.addEventListener("hunch-open", () => void hunch.open());
+    // viewer.ts switched the page's appearance; 自动 must re-contrast with it.
+    document.addEventListener("hunch-page-theme", () => hunch.applyTheme());
   }
   browser.runtime.onMessage.addListener((message: unknown) => {
     switch ((message as TabMessage).type) {

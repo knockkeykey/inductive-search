@@ -175,5 +175,40 @@ document.addEventListener("drop", (event) => {
   if (file) void openFile(file);
 });
 
+// Page appearance: "auto" follows the system, otherwise viewer.html's :root[data-theme] forces a side.
+// localStorage (not storage.local) so it applies synchronously, before the first paint of the document.
+type ViewerTheme = "auto" | "light" | "dark";
+const THEME_KEY = "hunch-viewer-theme";
+const themeButtons = [...$("theme").querySelectorAll<HTMLButtonElement>("button")];
+function applyViewerTheme(theme: ViewerTheme) {
+  if (theme === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  for (const button of themeButtons) {
+    const on = button.dataset.value === theme;
+    button.setAttribute("aria-checked", String(on));
+    button.tabIndex = on ? 0 : -1;
+  }
+}
+function setViewerTheme(theme: ViewerTheme) {
+  localStorage.setItem(THEME_KEY, theme);
+  applyViewerTheme(theme);
+  document.dispatchEvent(new CustomEvent("hunch-page-theme"));
+}
+const savedTheme = localStorage.getItem(THEME_KEY);
+applyViewerTheme(savedTheme === "light" || savedTheme === "dark" ? savedTheme : "auto");
+for (const button of themeButtons) {
+  button.addEventListener("click", () => setViewerTheme(button.dataset.value as ViewerTheme));
+  // Arrow keys move through the radio group, per the ARIA radiogroup pattern.
+  button.addEventListener("keydown", (event) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const i = themeButtons.indexOf(button);
+    const next = themeButtons[(i + step + themeButtons.length) % themeButtons.length]!;
+    setViewerTheme(next.dataset.value as ViewerTheme);
+    next.focus();
+  });
+}
+
 const src = params.get("src");
 if (src) void openUrl(src);

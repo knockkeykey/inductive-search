@@ -191,6 +191,37 @@ textarea::placeholder {
     0 0 0 0.5px var(--hunch-edge),
     0 1px 3px rgba(0, 0, 0, 0.12);
 }
+/* Search mode: one shared thumb slides between the equal-width options instead of jumping. */
+.hunch-mode {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+.hunch-mode::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: light-dark(var(--hunch-control), rgba(255, 255, 255, 0.18));
+  box-shadow:
+    0 0 0 0.5px var(--hunch-edge),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: translate 0.38s var(--hunch-ease);
+}
+.hunch-mode:has([data-value="conditions"][aria-checked="true"])::before {
+  translate: calc(100% + 2px) 0;
+}
+.hunch-mode button {
+  position: relative;
+  transition: color 0.25s;
+}
+.hunch-mode [aria-checked="true"] {
+  background: transparent;
+  box-shadow: none;
+}
 
 /* Floating dock: a Spotlight-style command bar */
 .hunch-dock {
@@ -1118,6 +1149,7 @@ textarea::placeholder {
 @media (prefers-reduced-motion: reduce) {
   *,
   .hunch-bar,
+  .hunch-mode::before,
   .hunch-scope::before,
   .hunch-scope::after {
     animation: none;
